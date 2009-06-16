@@ -1,0 +1,18 @@
+Import('env','libs')
+
+files=Glob('*.cc',strings=True)
+tnames=['add-server','headers-test','speed-test-load-group']
+tfiles=[x+'.cc' for x in tnames]
+for x in tfiles:
+    files.remove(x)
+
+l=env.StaticLibrary('pandata',files)
+libs.insert(1,l)
+
+t=[]
+for x in range(0,len(tnames)) :
+    t.append(env.Program(tnames[x],tfiles[x],LIBS=libs))
+
+env.Alias('tests',t)
+
+

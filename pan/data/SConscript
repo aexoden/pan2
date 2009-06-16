@@ -1,0 +1,17 @@
+Import('env','libs')
+
+files=Glob('*.cc',strings=True)
+tnames=['article-test','xref-test']
+tfiles=[x+'.cc' for x in tnames]
+for x in tfiles:
+    files.remove(x)
+
+l=env.StaticLibrary('data',files)
+libs.insert(0,l)
+
+t=[]
+for x in range(0,len(tnames)) :
+    t.append(env.Program(tnames[x],tfiles[x],LIBS=libs))
+
+env.Alias('tests',t)
+

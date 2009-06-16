@@ -1,0 +1,16 @@
+Import('env','libs')
+
+files=Glob('*.cc',strings=True)
+files.remove('adaptable-set-test.cc')
+files.remove('nzb-test.cc')
+
+l=env.StaticLibrary('tasks',files)
+libs.insert(0,l)
+
+t=[]
+t.append(env.Program('adaptable-set-test','adaptable-set-test.cc',LIBS=libs))
+t.append(env.Program('nzb-test','nzb-test.cc',LIBS=libs))
+
+env.Alias('tests',t)
+
+

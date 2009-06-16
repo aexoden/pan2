@@ -1,0 +1,6 @@
+Import('env','libs')
+e=env.Clone()
+e.AppendUnique(CPPDEFINES='PROTOTYPES')
+c=e.StaticLibrary('uulib',Glob('*.c'))
+libs.append(c)
+
