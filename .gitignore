@@ -1,3 +1,15 @@
 *~
 *.bak
-
+Makefile.in*
+install-sh
+intltool-*
+missing
+mkinstalldirs
+depcomp
+configure
+config.sub
+config.guess
+config.log
+config.h.in
+aclocal.m4
+autom4te.cache
