@@ -701,6 +701,26 @@ PostUI :: maybe_post_message (GMimeMessage * message)
 ****
 ***/
 
+namespace
+{
+	typedef struct
+	{
+		GPid pid;
+		char *fname;
+		PostUI *pui;
+	} se_data;
+	
+	void child_watch_cb(GPid pid, gint status, gpointer data)
+	{
+		se_data *d=static_cast<se_data*>(data);
+		static_cast<PostUI*>(d->pui)->spawn_editor_dead(static_cast<char*>(d->fname));
+#ifdef G_OS_WIN32
+		g_spawn_close_pid(pid);
+#endif
+		delete d;
+	}
+}
+
 void
 PostUI :: spawn_editor ()
 {
@@ -783,17 +803,36 @@ PostUI :: spawn_editor ()
   // spawn off the external editor
   if (ok) {
     GError * err (0);
-    g_spawn_sync (0, argv, 0, G_SPAWN_SEARCH_PATH, 0, 0, 0, 0, 0, &err);
+	se_data *data=new se_data;
+	data->fname=fname;
+	data->pui=this;
+#ifndef G_OS_WIN32
+    g_spawn_async (0, argv, 0, G_SPAWN_SEARCH_PATH, 0, 0, &data->pid, &err);
+#else
+    g_spawn_async (0, argv, 0, (GSpawnFlags)(G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD), 0, 0, &data->pid, &err);
+#endif
     if (err != NULL) {
       Log::add_err_va (_("Error starting external editor: %s"), err->message);
       g_clear_error (&err);
       ok = false;
-    }
+	  delete data;
+    } else {
+		g_child_watch_add(data->pid,child_watch_cb,static_cast<gpointer>(data));
+	}
+  } else {
+	  g_free(fname);
   }
 
+  g_strfreev (argv);
+}
+
+void PostUI::spawn_editor_dead(char *fname)
+{
+	GtkTextBuffer * buf (_body_buf);
+	
   // read the file contents back in
   std::string txt;
-  if (ok && file :: get_text_file_contents (fname, txt)) {
+  if (file :: get_text_file_contents (fname, txt)) {
     GtkTextIter start, end;
     gtk_text_buffer_get_bounds (buf, &start, &end);
     gtk_text_buffer_delete (buf, &start, &end);
@@ -803,7 +842,6 @@ PostUI :: spawn_editor ()
   // cleanup
   ::remove (fname);
   g_free (fname);
-  g_strfreev (argv);
 
   gtk_window_present (GTK_WINDOW(root()));
 }
