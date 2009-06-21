@@ -18,6 +18,7 @@
  */
 
 #include <config.h>
+#include <cstdio>
 #include <cstdarg>
 #include "progress.h"
 #include "string-view.h"

@@ -18,6 +18,7 @@
  */
 
 #include <config.h>
+#include <cstdio>
 #include <cctype>
 #include <algorithm>
 #include <pan/general/string-view.h>

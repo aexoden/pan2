@@ -18,6 +18,7 @@
  */
 
 #include <config.h>
+#include <cstdio>
 #include <iostream>
 #include <cstdarg>
 #include "log.h"

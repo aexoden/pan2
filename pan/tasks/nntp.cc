@@ -18,6 +18,7 @@
  */
 
 #include <config.h>
+#include <cstdio>
 #include <cassert>
 #include <cstdarg>
 #include <cstdlib> // abort, atoi, strtoul

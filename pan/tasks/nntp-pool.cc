@@ -18,6 +18,7 @@
  */
 
 #include <config.h>
+#include <cstdio>
 #include <ctime>
 #include <glib/gi18n.h>
 #include <pan/general/debug.h>
