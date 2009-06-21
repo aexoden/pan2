@@ -19,9 +19,9 @@
 
 #include <config.h>
 #include <cctype>
+#include <algorithm>
 #include <pan/general/string-view.h>
 #include "numbers.h"
-#include <algorithm>
 
 using namespace pan;
 
@@ -36,7 +36,7 @@ namespace
    typedef Numbers::ranges_t::const_iterator r_cit;
 
    bool
-   maybe_merge_ranges (Numbers::ranges_t & ranges, int low)
+   maybe_merge_ranges (Numbers::ranges_t & ranges, uint64_t low)
    {
       bool merged = false;
 
@@ -59,15 +59,15 @@ namespace
 /**
  * @return the number of articles newly-marked as read 
  */
-unsigned long
+uint64_t
 Numbers :: mark_range (const Range& rr)
 {
-   int i;
-   unsigned long retval = 0;
+   uint64_t i;
+   uint64_t retval = 0;
    bool range_found = false;
-   int low_index (std::lower_bound (_marked.begin(), _marked.end(), rr.low)
+   uint64_t low_index (std::lower_bound (_marked.begin(), _marked.end(), rr.low)
                   - _marked.begin());
-   int high_index (std::lower_bound (_marked.begin(), _marked.end(), rr.high)
+   uint64_t high_index (std::lower_bound (_marked.begin(), _marked.end(), rr.high)
                    - _marked.begin());
 
    retval = rr.high + 1 - rr.low;
@@ -122,14 +122,14 @@ Numbers :: mark_range (const Range& rr)
    return retval;
 }
 
-unsigned long
+uint64_t
 Numbers :: unmark_range (const Range& ur)
 {
-   unsigned long retval = 0;
-   int i;
-   int low_index (std::lower_bound (_marked.begin(), _marked.end(), ur.low)
+   uint64_t retval = 0;
+   uint64_t i;
+   uint64_t low_index (std::lower_bound (_marked.begin(), _marked.end(), ur.low)
                   - _marked.begin());
-   int high_index (std::lower_bound (_marked.begin(), _marked.end(), ur.high)
+   uint64_t high_index (std::lower_bound (_marked.begin(), _marked.end(), ur.high)
                    - _marked.begin ());
 
    for (i=low_index; i<=high_index && i<(int)_marked.size(); )
@@ -172,17 +172,17 @@ Numbers :: unmark_range (const Range& ur)
 ******  MARK (PUBLIC)
 *****/
 
-unsigned long
-Numbers :: mark_range (unsigned long low, unsigned long high, bool add)
+uint64_t
+Numbers :: mark_range (uint64_t low, uint64_t high, bool add)
 {
    const Range r (low, high);
    return add ? mark_range(r) : unmark_range(r);
 }
 
 bool
-Numbers :: mark_one (unsigned long number, bool add)
+Numbers :: mark_one (uint64_t number, bool add)
 {
-   const unsigned long changed_qty (mark_range (number, number, add));
+   const uint64_t changed_qty (mark_range (number, number, add));
 
    if (add)
       return changed_qty==0;
@@ -201,8 +201,8 @@ Numbers :: mark_str (const StringView& str, bool add)
       phigh.pop_token (plow, '-');
       plow.trim ();
       phigh.trim ();
-      const unsigned long low (plow.empty() ? 0 : strtoul (plow.str, NULL, 10));
-      const unsigned long high (phigh.empty() ? low : strtoul (phigh.str, NULL, 10));
+      const uint64_t low (plow.empty() ? 0 : strtoul (plow.str, NULL, 10));
+      const uint64_t high (phigh.empty() ? low : strtoul (phigh.str, NULL, 10));
       mark_range (low, high, add);
    }
 }
@@ -218,7 +218,7 @@ Numbers :: clear ()
 *****/
 
 void
-Numbers :: clip (unsigned long low, unsigned long high)
+Numbers :: clip (uint64_t low, uint64_t high)
 {
    r_it it = std::lower_bound (_marked.begin(), _marked.end(), low);
    _marked.erase (_marked.begin(), it);
@@ -237,7 +237,7 @@ Numbers :: clip (unsigned long low, unsigned long high)
 *****/
 
 bool
-Numbers :: is_marked (unsigned long number) const
+Numbers :: is_marked (uint64_t number) const
 {
    r_cit it = std::lower_bound (_marked.begin(), _marked.end(), number);
 
@@ -262,11 +262,11 @@ Numbers :: to_string (std::string & str) const
    {
       Range r (*it);
 
-      snprintf (buf, sizeof(buf), "%lu", r.low);
+      snprintf (buf, sizeof(buf), "%llu", r.low);
       str += buf;
 
       if (r.low != r.high) {
-         snprintf (buf, sizeof(buf), "-%lu", r.high);
+         snprintf (buf, sizeof(buf), "-%llu", r.high);
          str += buf;
       }
 
