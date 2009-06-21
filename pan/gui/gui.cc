@@ -592,7 +592,6 @@ namespace
         if (!tasks.empty())
           _queue.add_tasks (tasks, Queue::BOTTOM);
         g_object_unref (mem_stream);
-        g_object_unref (wrapper);
       }
     }
 
@@ -1052,8 +1051,9 @@ void GUI :: do_supersede_article ()
   if ((cpch = g_mime_object_get_header ((GMimeObject *)message,     "Followup-To")))
               g_mime_object_set_header ((GMimeObject *)new_message, "Followup-To", cpch);
   gboolean  unused (false);
-  char * body (g_mime_message_get_body (message, &unused));
+  char * body (pan_g_mime_message_get_body (message, &unused));
   GMimeStream * stream = g_mime_stream_mem_new_with_buffer (body, strlen(body));
+  g_free (body);
   GMimeDataWrapper * content_object = g_mime_data_wrapper_new_with_stream (stream, GMIME_CONTENT_ENCODING_DEFAULT);
   GMimePart * part = g_mime_part_new ();
   g_mime_part_set_content_object (part, content_object);
@@ -1199,7 +1199,9 @@ GUI :: do_post ()
 
   // content type
   GMimePart * part = g_mime_part_new ();
-  g_mime_object_set_content_type ((GMimeObject *) part, g_mime_content_type_new_from_string ("text/plain; charset=UTF-8"));
+  GMimeContentType *type = g_mime_content_type_new_from_string ("text/plain; charset=UTF-8");
+  g_mime_object_set_content_type ((GMimeObject *) part, type);
+  g_object_unref (type);
   g_mime_part_set_content_encoding (part, GMIME_CONTENT_ENCODING_8BIT);
   g_mime_message_set_mime_part (message, GMIME_OBJECT(part));
   g_object_unref (part);

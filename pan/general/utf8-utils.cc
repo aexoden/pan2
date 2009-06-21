@@ -150,20 +150,18 @@ pan :: mime_part_to_utf8 (GMimePart     * part,
   std::string ret;
 
   g_return_val_if_fail (GMIME_IS_PART(part), ret);
-
   const char * charset =
-	g_mime_object_get_content_type_parameter (GMIME_OBJECT (part), "charset");
+    g_mime_object_get_content_type_parameter (GMIME_OBJECT (part), "charset");
   GMimeDataWrapper * content = g_mime_part_get_content_object (part);
   GMimeStream *stream = g_mime_stream_mem_new ();
   
   g_mime_data_wrapper_write_to_stream (content,stream);
-  g_object_unref (content);
   GByteArray *buf = ((GMimeStreamMem *) stream)->buffer;
   ret = content_to_utf8 (StringView ((const char *) buf->data, buf->len)
-	, charset, fallback_charset);
+    , charset, fallback_charset);
 
   g_object_unref (stream);
-  
+
   return ret;
 }
 

@@ -31,6 +31,7 @@ extern "C"
 #include <pan/general/macros.h>
 #include <pan/general/messages.h>
 #include <pan/general/string-view.h>
+#include <pan/general/log.h>
 #include "mime-utils.h"
 
 #define is_nonempty_string(a) ((a) && (*a))
@@ -756,8 +757,6 @@ namespace
     GMimeStream * stream = g_mime_data_wrapper_get_stream (content);
     g_mime_stream_reset (stream);
     GMimeStream * istream = g_mime_stream_buffer_new (stream, GMIME_STREAM_BUFFER_BLOCK_READ);
-    g_object_unref (stream);
-    g_object_unref (content);
 
     // break it into separate parts for text, uu, and yenc pieces.
     temp_parts_t parts;
@@ -1018,10 +1017,12 @@ mime :: remove_multipart_part_from_subject (const StringView    & subject,
   normalize_subject (subject, STRIP_MULTIPART_NUMERATOR, setme);
 }
 
-static GMimeObject *
+namespace
+{
+GMimeObject *
 handle_multipart_mixed (GMimeMultipart *multipart, gboolean *is_html);
 
-static GMimeObject *
+GMimeObject *
 handle_multipart_alternative (GMimeMultipart *multipart, gboolean *is_html)
 {
         GMimeObject *mime_part, *text_part = NULL;
@@ -1043,7 +1044,7 @@ handle_multipart_alternative (GMimeMultipart *multipart, gboolean *is_html)
         return text_part;
 }
 
-static GMimeObject *
+GMimeObject *
 handle_multipart_mixed (GMimeMultipart *multipart, gboolean *is_html)
 {
         GMimeObject *mime_part, *text_part = NULL;
@@ -1086,15 +1087,17 @@ handle_multipart_mixed (GMimeMultipart *multipart, gboolean *is_html)
         return text_part;
 }
 
+}
 #define NEEDS_DECODING(encoding) ((encoding == GMIME_CONTENT_ENCODING_BASE64) ||   \
                                   (encoding == GMIME_CONTENT_ENCODING_UUENCODE) || \
                                   (encoding == GMIME_CONTENT_ENCODING_QUOTEDPRINTABLE))
 
-static const char *
-g_mime_part_get_content (const GMimePart *mime_part, size_t *len)
+namespace
 {
-        const char *retval = NULL;
-        GMimeStream *stream;
+char *
+pan_g_mime_part_get_content (const GMimePart *mime_part, size_t *len)
+{
+        char *retval = NULL;
 
         g_return_val_if_fail (GMIME_IS_PART (mime_part), NULL);
 
@@ -1103,49 +1106,25 @@ g_mime_part_get_content (const GMimePart *mime_part, size_t *len)
                 return NULL;
         }
 
-        stream = mime_part->content->stream;
-        if (!GMIME_IS_STREAM_MEM (stream) || NEEDS_DECODING (mime_part->content->encoding)) {
-                /* Decode and cache this mime part's contents... */
-                GMimeStream *cache;
-                GByteArray *buf;
-
-                buf = g_byte_array_new ();
-                cache = g_mime_stream_mem_new_with_byte_array (buf);
-
-                g_mime_data_wrapper_write_to_stream (mime_part->content, cache);
-
-                g_mime_data_wrapper_set_stream (mime_part->content, cache);
-                g_mime_data_wrapper_set_encoding (mime_part->content, GMIME_CONTENT_ENCODING_DEFAULT);
-                g_object_unref (cache);
-
-                *len = buf->len;
-                retval = (char *) buf->data;
-        } else {
-                GByteArray *buf = GMIME_STREAM_MEM (stream)->buffer;
-                off_t end_index = (off_t) buf->len;
-                off_t start_index = 0;
-
-                /* check boundaries */
-                if (stream->bound_start >= 0)
-                        start_index = CLAMP (stream->bound_start, 0, (off_t) buf->len);
-                if (stream->bound_end >= 0)
-                        end_index = CLAMP (stream->bound_end, 0, (off_t) buf->len);
-                if (end_index < start_index)
-                        end_index = start_index;
-
-                *len = end_index - start_index;
-                retval = (char *) buf->data + start_index;
-        }
+        GMimeDataWrapper *wrapper = g_mime_part_get_content_object(mime_part);
+        GMimeStream *stream = g_mime_stream_mem_new();
+        g_mime_data_wrapper_write_to_stream (wrapper, stream);
+        GByteArray *bytes=g_mime_stream_mem_get_byte_array((GMimeStreamMem*)stream);
+        *len=bytes->len;
+Log::add_info_va("part content size %d",*len);
+        if (bytes->len)
+          retval=(char*)g_memdup(bytes->data,bytes->len);
+        g_object_unref(stream);
 
         return retval;
 }
+}
 
-char *g_mime_message_get_body (GMimeMessage *message, gboolean *is_html)
+char *pan::pan_g_mime_message_get_body (GMimeMessage *message, gboolean *is_html)
 {
         GMimeObject *mime_part = NULL;
         GMimeContentType *type;
         GMimeMultipart *multipart;
-        const char *content;
         char *body = NULL;
         size_t len = 0;
 
@@ -1170,14 +1149,13 @@ char *g_mime_message_get_body (GMimeMessage *message, gboolean *is_html)
         }
 
         if (mime_part != NULL) {
-                content = g_mime_part_get_content (GMIME_PART (mime_part), &len);
-                body = g_strndup (content, len);
+                body = pan_g_mime_part_get_content (GMIME_PART (mime_part), &len);
         }
 
         return body;
 }
 
-void g_mime_message_add_recipients_from_string (GMimeMessage *message, GMimeRecipientType type, const char *string)
+void pan::pan_g_mime_message_add_recipients_from_string (GMimeMessage *message, GMimeRecipientType type, const char *string)
 {
         InternetAddressList *addrlist;
         if ((addrlist = internet_address_list_parse_string (string))) {

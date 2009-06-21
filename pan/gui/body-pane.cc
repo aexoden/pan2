@@ -837,7 +837,7 @@ namespace
       }
 
       g_object_unref (mem_stream);
-      g_object_unref (wrapper);
+      //g_object_unref (wrapper);
     }
 
     // flush the loader
@@ -1587,7 +1587,7 @@ BodyPane :: create_followup_or_reply (bool is_reply)
     const std::string reply_to   (get_header (_message, "Reply-To",    message_charset, group_charset));
     if (is_reply || fup_to=="poster") {
       const std::string& to (reply_to.empty() ? from : reply_to);
-      g_mime_message_add_recipients_from_string (msg, GMIME_RECIPIENT_TYPE_TO, to.c_str());
+      pan_g_mime_message_add_recipients_from_string (msg, GMIME_RECIPIENT_TYPE_TO, to.c_str());
     } else {
       const std::string& groups (fup_to.empty() ? newsgroups : fup_to);
       g_mime_object_append_header ((GMimeObject *) msg, "Newsgroups", groups.c_str());
@@ -1669,6 +1669,7 @@ BodyPane :: create_followup_or_reply (bool is_reply)
     g_mime_part_set_content_object (part, wrapper);
     g_mime_part_set_content_encoding (part, GMIME_CONTENT_ENCODING_8BIT);
     g_mime_message_set_mime_part (msg, GMIME_OBJECT(part));
+    g_object_unref (new_type);
     g_object_unref (wrapper);
     g_object_unref (part);
     g_object_unref (stream);

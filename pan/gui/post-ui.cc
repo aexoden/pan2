@@ -530,7 +530,7 @@ PostUI :: maybe_mail_message (GMimeMessage * message)
   std::string url, to, groups;
   gboolean unused;
   char * headers (g_mime_object_get_headers ((GMimeObject *) message));
-  char * body (g_mime_message_get_body (message, &unused));
+  char * body (pan_g_mime_message_get_body (message, &unused));
   StringView key, val, v(headers);
   v.trim ();
   while (v.pop_token (val, '\n') && val.pop_token(key,':')) {
@@ -966,7 +966,7 @@ PostUI :: new_message_from_ui (Mode mode)
   // headers from the ui: To
   const StringView to (gtk_entry_get_text (GTK_ENTRY(_to_entry)));
   if (!to.empty())
-    g_mime_message_add_recipients_from_string (msg, GMIME_RECIPIENT_TYPE_TO, to.str);
+    pan_g_mime_message_add_recipients_from_string (msg, GMIME_RECIPIENT_TYPE_TO, to.str);
 
   // headers from the ui: Newsgroups
   const StringView groups (gtk_entry_get_text (GTK_ENTRY(_groups_entry)));
@@ -1586,7 +1586,7 @@ PostUI :: set_message (GMimeMessage * message)
 
   // update body
   int ignored;
-  char * tmp = g_mime_message_get_body (message, &ignored);
+  char * tmp = pan_g_mime_message_get_body (message, &ignored);
   s = utf8ize (tmp);
   g_free (tmp);
   if (!s.empty()) {
