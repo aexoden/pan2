@@ -189,7 +189,12 @@ std::string
 DataImpl :: get_server_address (const Quark& server) const
 {
   const Server * s (find_server (server));
-  return std::string (s ? s->host : "");
+  if(s)
+  {
+	  std::ostringstream x(s->host,std::ios_base::ate);
+	  x<<":"<<s->port;
+	  return x.str();
+  } else return std::string("");
 }
 
 int
