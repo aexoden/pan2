@@ -455,10 +455,10 @@ namespace
       part->stream = g_mime_stream_mem_new ();
       if (part->type != ENC_PLAIN) {
 	part->filter_stream =
-	  g_mime_stream_filter_new_with_stream (part->stream);
+	  g_mime_stream_filter_new (part->stream);
         part->filter = part->type == ENC_UU
-	  ? g_mime_filter_basic_new_type (GMIME_FILTER_BASIC_UU_DEC)
-	  : g_mime_filter_yenc_new (GMIME_FILTER_YENC_DIRECTION_DECODE);
+	  ? g_mime_filter_basic_new (GMIME_CONTENT_ENCODING_UUENCODE, FALSE)
+	  : g_mime_filter_yenc_new (FALSE);
 	g_mime_stream_filter_add (GMIME_STREAM_FILTER(part->filter_stream),
                                   part->filter);
       }
@@ -729,18 +729,21 @@ namespace
   {
     // if the part is a multipart, check its subparts
     if (GMIME_IS_MULTIPART (*part)) {
-      GList * subparts = GMIME_MULTIPART (*part)->subparts;
-      while (subparts) {
-        GMimeObject * subpart = (GMimeObject *) subparts->data;
+      GMimeMultipart *multipart = (GMimeMultipart *) *part;
+      int count = g_mime_multipart_get_count(multipart);
+      int i;
+      
+      for (i = 0; i < count; i++) {
+        GMimeObject * subpart = g_mime_multipart_remove_at (multipart, i);
         handle_uu_and_yenc_in_text_plain (&subpart);
-        subparts->data = subpart;
-        subparts = subparts->next;
+        g_mime_multipart_insert (multipart, i, subpart);
+        g_object_unref (subpart);
       }
       return;
     }
 
     // we assume that inlined yenc and uu are only in text/plain blocks
-    const GMimeContentType * content_type = g_mime_object_get_content_type (*part);
+    GMimeContentType * content_type = g_mime_object_get_content_type (*part);
     if (!g_mime_content_type_is_type (content_type, "text", "plain"))
       return;
 
@@ -781,22 +784,22 @@ namespace
           g_mime_part_set_filename (subpart, filename);
 
         GMimeStream * subpart_stream = tmp_part->stream;
-        content = g_mime_data_wrapper_new_with_stream (subpart_stream, GMIME_PART_ENCODING_DEFAULT);
+        content = g_mime_data_wrapper_new_with_stream (subpart_stream, GMIME_CONTENT_ENCODING_DEFAULT);
         g_mime_part_set_content_object (subpart, content);
-        g_mime_multipart_add_part (GMIME_MULTIPART (multipart), GMIME_OBJECT (subpart));
+        g_mime_multipart_add (GMIME_MULTIPART (multipart), GMIME_OBJECT (subpart));
 
         g_object_unref (content);
         g_object_unref (subpart);
       }
 		
       // replace the old part with the new multipart
-      g_mime_object_unref (*part);
+      g_object_unref (*part);
       *part = GMIME_OBJECT (multipart);
     }
 
     foreach (temp_parts_t, parts, it)
       delete *it;
-    g_mime_stream_unref (istream);
+    g_object_unref (istream);
   }
 }
 
@@ -1013,4 +1016,175 @@ mime :: remove_multipart_part_from_subject (const StringView    & subject,
                                             std::string         & setme)
 {
   normalize_subject (subject, STRIP_MULTIPART_NUMERATOR, setme);
+}
+
+static GMimeObject *
+handle_multipart_mixed (GMimeMultipart *multipart, gboolean *is_html);
+
+static GMimeObject *
+handle_multipart_alternative (GMimeMultipart *multipart, gboolean *is_html)
+{
+        GMimeObject *mime_part, *text_part = NULL;
+        GMimeContentType *type;
+        int count = g_mime_multipart_get_count (multipart);
+
+        for (int i = 0; i < count; ++i) {
+                mime_part = g_mime_multipart_get_part (multipart, i);
+
+                type = g_mime_object_get_content_type (mime_part);
+                if (g_mime_content_type_is_type (type, "text", "*")) {
+                        if (!text_part || !g_ascii_strcasecmp (type->subtype, "plain")) {
+                                *is_html = !g_ascii_strcasecmp (type->subtype, "html");
+                                text_part = mime_part;
+                        }
+                }
+        }
+
+        return text_part;
+}
+
+static GMimeObject *
+handle_multipart_mixed (GMimeMultipart *multipart, gboolean *is_html)
+{
+        GMimeObject *mime_part, *text_part = NULL;
+        GMimeContentType *type, *first_type = NULL;
+        int count = g_mime_multipart_get_count (multipart);
+
+        for (int i = 0; i < count; ++i) {
+                mime_part = g_mime_multipart_get_part (multipart, i);
+
+                type = g_mime_object_get_content_type (mime_part);
+                if (GMIME_IS_MULTIPART (mime_part)) {
+                        multipart = GMIME_MULTIPART (mime_part);
+                        if (g_mime_content_type_is_type (type, "multipart", "alternative")) {
+                                mime_part = handle_multipart_alternative (multipart, is_html);
+                                if (mime_part)
+                                        return mime_part;
+                        } else {
+                                mime_part = handle_multipart_mixed (multipart, is_html);
+                                if (mime_part && !text_part)
+                                        text_part = mime_part;
+                        }
+                } else if (g_mime_content_type_is_type (type, "text", "*")) {
+                        if (!g_ascii_strcasecmp (type->subtype, "plain")) {
+                                /* we got what we came for */
+                                *is_html = !g_ascii_strcasecmp (type->subtype, "html");
+                                return mime_part;
+                        }
+
+                        /* if we haven't yet found a text part or if it is a type we can
+ *                          * understand and it is the first of that type, save it */
+                        if (!text_part || (!g_ascii_strcasecmp (type->subtype, "plain") && (first_type &&
+                                           g_ascii_strcasecmp (type->subtype, first_type->subtype) != 0))) {
+                                *is_html = !g_ascii_strcasecmp (type->subtype, "html");
+                                text_part = mime_part;
+                                first_type = type;
+                        }
+                }
+        }
+
+        return text_part;
+}
+
+#define NEEDS_DECODING(encoding) ((encoding == GMIME_CONTENT_ENCODING_BASE64) ||   \
+                                  (encoding == GMIME_CONTENT_ENCODING_UUENCODE) || \
+                                  (encoding == GMIME_CONTENT_ENCODING_QUOTEDPRINTABLE))
+
+static const char *
+g_mime_part_get_content (const GMimePart *mime_part, size_t *len)
+{
+        const char *retval = NULL;
+        GMimeStream *stream;
+
+        g_return_val_if_fail (GMIME_IS_PART (mime_part), NULL);
+
+        if (!mime_part->content || !mime_part->content->stream) {
+                g_warning ("no content set on this mime part");
+                return NULL;
+        }
+
+        stream = mime_part->content->stream;
+        if (!GMIME_IS_STREAM_MEM (stream) || NEEDS_DECODING (mime_part->content->encoding)) {
+                /* Decode and cache this mime part's contents... */
+                GMimeStream *cache;
+                GByteArray *buf;
+
+                buf = g_byte_array_new ();
+                cache = g_mime_stream_mem_new_with_byte_array (buf);
+
+                g_mime_data_wrapper_write_to_stream (mime_part->content, cache);
+
+                g_mime_data_wrapper_set_stream (mime_part->content, cache);
+                g_mime_data_wrapper_set_encoding (mime_part->content, GMIME_CONTENT_ENCODING_DEFAULT);
+                g_object_unref (cache);
+
+                *len = buf->len;
+                retval = (char *) buf->data;
+        } else {
+                GByteArray *buf = GMIME_STREAM_MEM (stream)->buffer;
+                off_t end_index = (off_t) buf->len;
+                off_t start_index = 0;
+
+                /* check boundaries */
+                if (stream->bound_start >= 0)
+                        start_index = CLAMP (stream->bound_start, 0, (off_t) buf->len);
+                if (stream->bound_end >= 0)
+                        end_index = CLAMP (stream->bound_end, 0, (off_t) buf->len);
+                if (end_index < start_index)
+                        end_index = start_index;
+
+                *len = end_index - start_index;
+                retval = (char *) buf->data + start_index;
+        }
+
+        return retval;
+}
+
+char *g_mime_message_get_body (GMimeMessage *message, gboolean *is_html)
+{
+        GMimeObject *mime_part = NULL;
+        GMimeContentType *type;
+        GMimeMultipart *multipart;
+        const char *content;
+        char *body = NULL;
+        size_t len = 0;
+
+        g_return_val_if_fail (GMIME_IS_MESSAGE (message), NULL);
+        g_return_val_if_fail (is_html != NULL, NULL);
+
+        type = g_mime_object_get_content_type (message->mime_part);
+        if (GMIME_IS_MULTIPART (message->mime_part)) {
+                /* let's see if we can find a body in the multipart */
+                multipart = GMIME_MULTIPART (message->mime_part);
+                if (g_mime_content_type_is_type (type, "multipart", "alternative"))
+                        mime_part = handle_multipart_alternative (multipart, is_html);
+                else
+                        mime_part = handle_multipart_mixed (multipart, is_html);
+        } else if (g_mime_content_type_is_type (type, "text", "*")) {
+                /* this *has* to be the message body */
+                if (g_mime_content_type_is_type (type, "text", "html"))
+                        *is_html = TRUE;
+                else
+                        *is_html = FALSE;
+                mime_part = message->mime_part;
+        }
+
+        if (mime_part != NULL) {
+                content = g_mime_part_get_content (GMIME_PART (mime_part), &len);
+                body = g_strndup (content, len);
+        }
+
+        return body;
+}
+
+void g_mime_message_add_recipients_from_string (GMimeMessage *message, GMimeRecipientType type, const char *string)
+{
+        InternetAddressList *addrlist;
+        if ((addrlist = internet_address_list_parse_string (string))) {
+        	for (int i = 0; i < internet_address_list_length (addrlist); ++i) {
+                	InternetAddress *ia = internet_address_list_get_address (addrlist, i);
+                	if (INTERNET_ADDRESS_IS_MAILBOX(ia))
+				g_mime_message_add_recipient (message, type, internet_address_get_name(ia), internet_address_mailbox_get_addr(INTERNET_ADDRESS_MAILBOX(ia)));
+		}
+        }
 }
