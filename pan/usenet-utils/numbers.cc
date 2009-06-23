@@ -21,6 +21,8 @@
 #include <cstdio>
 #include <cctype>
 #include <algorithm>
+#include <glib.h>
+#include <glib/gprintf.h>
 #include <pan/general/string-view.h>
 #include "numbers.h"
 
@@ -37,11 +39,11 @@ namespace
    typedef Numbers::ranges_t::const_iterator r_cit;
 
    bool
-   maybe_merge_ranges (Numbers::ranges_t & ranges, uint64_t low)
+   maybe_merge_ranges (Numbers::ranges_t & ranges, Numbers::ranges_t::size_type low)
    {
       bool merged = false;
 
-      if (0<=low && low<=(int)ranges.size()-2)
+      if (0<=low && low+2<=ranges.size())
       {
          Numbers::Range & r1 = ranges[low];
          Numbers::Range & r2 = ranges[low+1];
@@ -63,17 +65,17 @@ namespace
 uint64_t
 Numbers :: mark_range (const Range& rr)
 {
-   uint64_t i;
+   ranges_t::size_type i;
    uint64_t retval = 0;
    bool range_found = false;
-   uint64_t low_index (std::lower_bound (_marked.begin(), _marked.end(), rr.low)
+   ranges_t::size_type low_index (std::lower_bound (_marked.begin(), _marked.end(), rr.low)
                   - _marked.begin());
-   uint64_t high_index (std::lower_bound (_marked.begin(), _marked.end(), rr.high)
+   ranges_t::size_type high_index (std::lower_bound (_marked.begin(), _marked.end(), rr.high)
                    - _marked.begin());
 
    retval = rr.high + 1 - rr.low;
 
-   for (i=low_index; i<=high_index && i<(int)_marked.size(); ++i)
+   for (i=low_index; i<=high_index && i<_marked.size(); ++i)
    {
       Range& r = _marked[i];
 
@@ -98,7 +100,7 @@ Numbers :: mark_range (const Range& rr)
       }
       else if (r.contains (rr.low)) /* change high */
       {
-         Range * next = i==(int)_marked.size()-1 ? NULL : &_marked[i+1];
+         Range * next = i==_marked.size()-1 ? NULL : &_marked[i+1];
          range_found = true;
          retval -= r.high+1 - rr.low; /* remove intersection from retval */
          r.high = next ? std::min(rr.high, next->low-1) : rr.high;
@@ -108,11 +110,11 @@ Numbers :: mark_range (const Range& rr)
    if (!range_found)
    {
       _marked.insert (_marked.begin()+low_index, rr);
-      --low_index;
+      if (low_index!=0) --low_index;
       ++high_index;
    }
 
-   for (i=low_index; i<=high_index && i<(int)_marked.size(); )
+   for (i=low_index; i<=high_index && i<_marked.size(); )
    {
       if (maybe_merge_ranges (_marked, i))
          --high_index;
@@ -127,13 +129,13 @@ uint64_t
 Numbers :: unmark_range (const Range& ur)
 {
    uint64_t retval = 0;
-   uint64_t i;
-   uint64_t low_index (std::lower_bound (_marked.begin(), _marked.end(), ur.low)
+   ranges_t::size_type i;
+   ranges_t::size_type low_index (std::lower_bound (_marked.begin(), _marked.end(), ur.low)
                   - _marked.begin());
-   uint64_t high_index (std::lower_bound (_marked.begin(), _marked.end(), ur.high)
+   ranges_t::size_type high_index (std::lower_bound (_marked.begin(), _marked.end(), ur.high)
                    - _marked.begin ());
 
-   for (i=low_index; i<=high_index && i<(int)_marked.size(); )
+   for (i=low_index; i<=high_index && i<_marked.size(); )
    {
       Range& r (_marked[i]);
       if (ur.contains (r)) // remove
@@ -202,8 +204,8 @@ Numbers :: mark_str (const StringView& str, bool add)
       phigh.pop_token (plow, '-');
       plow.trim ();
       phigh.trim ();
-      const uint64_t low (plow.empty() ? 0 : strtoul (plow.str, NULL, 10));
-      const uint64_t high (phigh.empty() ? low : strtoul (phigh.str, NULL, 10));
+      const uint64_t low (plow.empty() ? 0 : g_ascii_strtoull (plow.str, NULL, 10));
+      const uint64_t high (phigh.empty() ? low : g_ascii_strtoull (phigh.str, NULL, 10));
       mark_range (low, high, add);
    }
 }
@@ -263,15 +265,11 @@ Numbers :: to_string (std::string & str) const
    {
       Range r (*it);
 
-      snprintf (buf, sizeof(buf), "%llu", r.low);
+      if (r.low == r.high)
+        g_snprintf (buf, sizeof(buf), "%llu,", r.low);
+      else
+         g_snprintf (buf, sizeof(buf), "%llu-%llu,", r.low,r.high);
       str += buf;
-
-      if (r.low != r.high) {
-         snprintf (buf, sizeof(buf), "-%llu", r.high);
-         str += buf;
-      }
-
-      str += ',';
    }
 
    if (!str.empty())
