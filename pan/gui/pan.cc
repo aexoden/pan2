@@ -311,6 +311,8 @@ main (int argc, char *argv[])
       // with a gui or without.
       if (gui) {
         TaskPane * pane = new TaskPane (queue, prefs);
+        GdkPixbuf * pixbuf = gdk_pixbuf_new_from_inline (-1, icon_pan, FALSE, 0);
+        gtk_window_set_default_icon (pixbuf);
         GtkWidget * w (pane->root());
         gtk_widget_show_all (w);
         g_signal_connect (w, "destroy", G_CALLBACK(destroy_cb), 0);
