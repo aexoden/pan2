@@ -958,13 +958,9 @@ BodyPane :: append_part (GMimeObject * obj, GtkAllocation * widget_size)
 void
 BodyPane :: foreach_part_cb (GMimeObject* /*parent*/, GMimeObject* o, gpointer self)
 {
-  if (GMIME_IS_MULTIPART (o))
-    g_mime_multipart_foreach (GMIME_MULTIPART (o), foreach_part_cb, self);
-  else {
-    BodyPane * pane = static_cast<BodyPane*>(self);
-    GtkWidget * w (pane->_text);
-    pane->append_part (o, &w->allocation);
-  }
+  BodyPane * pane = static_cast<BodyPane*>(self);
+  GtkWidget * w (pane->_text);
+  pane->append_part (o, &w->allocation);
 }
 
 
