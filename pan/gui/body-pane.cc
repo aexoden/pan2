@@ -1527,11 +1527,12 @@ namespace
   void get_utf8_body_foreach_part (GMimeObject* /*parent*/, GMimeObject *o
     , gpointer user_data)
   {
-    GMimePart * part = GMIME_PART (o);
+    GMimePart * part;
     GMimeContentType * type = g_mime_object_get_content_type (o);
     const bool is_text (g_mime_content_type_is_type (type, "text", "*"));
     if (is_text)
     {
+      part = GMIME_PART (o);
       ForeachPartData *data (static_cast<ForeachPartData*>(user_data));
       data->body += mime_part_to_utf8 (part, data->fallback_charset.c_str());
     }

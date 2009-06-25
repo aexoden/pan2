@@ -733,9 +733,11 @@ namespace
       GMimeMultipart *multipart = (GMimeMultipart *) *part;
       int count = g_mime_multipart_get_count(multipart);
       int i;
-      
       for (i = 0; i < count; i++) {
         GMimeObject * subpart = g_mime_multipart_remove_at (multipart, i);
+        //work around possible gmime bug
+        if(!subpart)
+          continue;
         handle_uu_and_yenc_in_text_plain (&subpart);
         g_mime_multipart_insert (multipart, i, subpart);
         g_object_unref (subpart);
