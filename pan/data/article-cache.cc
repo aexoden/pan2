@@ -405,8 +405,8 @@ ArticleCache :: get_message (const mid_sequence_t& mids)
   // load the streams
   typedef std::vector<GMimeStream*> streams_t;
   streams_t streams;
-  //const bool in_memory (mids.size() <= 2u);
-  const bool in_memory (true); // workaround for bug #439841
+  const bool in_memory (mids.size() <= 10u);
+  //const bool in_memory (true); // workaround for bug #439841
   foreach_const (mid_sequence_t, mids, it) {
     const Quark mid (*it);
     GMimeStream * stream (0);
