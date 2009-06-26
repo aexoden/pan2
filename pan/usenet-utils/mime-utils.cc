@@ -424,7 +424,7 @@ namespace
       if (filter)
         g_object_unref (filter);
       if (filter_stream)
-	g_object_unref (filter_stream);
+        g_object_unref (filter_stream);
     }
   };
 
@@ -433,8 +433,9 @@ namespace
   TempPart* find_filename_part (temp_parts_t& parts, const char * filename)
   {
     if (filename && *filename) {
+      TempPart *part;
       foreach (temp_parts_t, parts, it) {
-        TempPart * part (*it);
+        part = *it;
         if (part->filename && !strcmp(filename,part->filename))
           return part;
       }
@@ -455,12 +456,12 @@ namespace
     if (!part->stream) {
       part->stream = g_mime_stream_mem_new ();
       if (part->type != ENC_PLAIN) {
-	part->filter_stream =
-	  g_mime_stream_filter_new (part->stream);
+        part->filter_stream =
+          g_mime_stream_filter_new (part->stream);
         part->filter = part->type == ENC_UU
-	  ? g_mime_filter_basic_new (GMIME_CONTENT_ENCODING_UUENCODE, FALSE)
-	  : g_mime_filter_yenc_new (FALSE);
-	g_mime_stream_filter_add (GMIME_STREAM_FILTER(part->filter_stream),
+          ? g_mime_filter_basic_new (GMIME_CONTENT_ENCODING_UUENCODE, FALSE)
+          : g_mime_filter_yenc_new (FALSE);
+        g_mime_stream_filter_add (GMIME_STREAM_FILTER(part->filter_stream),
                                   part->filter);
       }
     }
@@ -488,10 +489,11 @@ separate_encoded_parts (GMimeStream  * istream,
 
 	sub_begin = 0;
 	line = g_byte_array_sized_new (4096);
+  char *line_str, *pch;
 	while ((line_len = stream_readln (istream, line, &linestart_pos)))
 	{
-		char * line_str = (char*) line->data;
-		char * pch = strchr (line_str, '\n');
+		line_str = (char*) line->data;
+		pch = strchr (line_str, '\n');
 		if (pch != NULL) {
 			pch[1] = '\0';
 			line_len = pch - line_str;
@@ -501,7 +503,7 @@ separate_encoded_parts (GMimeStream  * istream,
 		{
 			case ENC_PLAIN:
 			{
-                                const StringView line_pstr (line_str, line_len);
+        const StringView line_pstr (line_str, line_len);
 
 				if (uu_is_beginning_line (line_pstr))
 				{
@@ -519,8 +521,8 @@ separate_encoded_parts (GMimeStream  * istream,
 					// start a new section (or, if filename matches, continue an existing one)
 					sub_begin = linestart_pos;
 					uu_parse_begin_line (line_pstr, &filename, &mode);
-  					cur = find_filename_part (appendme, filename);
-                                        if (cur)
+  				cur = find_filename_part (appendme, filename);
+          if (cur)
 						g_free (filename);
 					else
 						cur = new TempPart (type=ENC_UU, filename);
@@ -558,7 +560,6 @@ separate_encoded_parts (GMimeStream  * istream,
 				else if (cur == NULL)
 				{
 					sub_begin = linestart_pos;
-
 					cur = new TempPart (type = ENC_PLAIN);
 				}
 				break;
@@ -571,7 +572,7 @@ separate_encoded_parts (GMimeStream  * istream,
 					if (sub_begin < 0)
 						sub_begin = linestart_pos;
 					stream = g_mime_stream_substream (istream, sub_begin, linestart_pos+line_len);
-  					apply_source_and_maybe_filter (cur, stream);
+          apply_source_and_maybe_filter (cur, stream);
 					append_if_not_present (appendme, cur);
 
 					cur = NULL;
@@ -583,9 +584,8 @@ separate_encoded_parts (GMimeStream  * istream,
 					if (sub_begin >= 0)
 					{
 						GMimeStream * stream = g_mime_stream_substream (istream, sub_begin, linestart_pos);
-  						apply_source_and_maybe_filter (cur, stream);
+            apply_source_and_maybe_filter (cur, stream);
 					}
-
 					sub_begin = -1;
 				}
 				else if (sub_begin == -1)
@@ -605,7 +605,7 @@ separate_encoded_parts (GMimeStream  * istream,
 				if (yenc_is_ending_line (line_str))
 				{
 					GMimeStream * stream = g_mime_stream_substream (istream, sub_begin, linestart_pos+line_len);
-  					apply_source_and_maybe_filter (cur, stream);
+          apply_source_and_maybe_filter (cur, stream);
 					yenc_parse_end_line (line_str, &cur->y_size, NULL, &cur->y_pcrc, &cur->y_crc);
 					append_if_not_present (appendme, cur);
 
@@ -633,7 +633,7 @@ separate_encoded_parts (GMimeStream  * istream,
 		if (sub_begin >= 0)
 		{
 			GMimeStream * stream = g_mime_stream_substream (istream, sub_begin, linestart_pos);
-  			apply_source_and_maybe_filter (cur, stream);
+      apply_source_and_maybe_filter (cur, stream);
 		}
 
 		/* just in case someone started with "yenc" or "begin 644 asf" in a text message to fuck with unwary newsreaders */
@@ -706,7 +706,7 @@ mime :: guess_part_type_from_filename (const char   * filename,
 	/* sanity clause */
 	pan_return_if_fail (is_nonempty_string(filename));
 
-       	suffix = strrchr (filename, '.');
+  suffix = strrchr (filename, '.');
 	if (suffix != NULL) {
 		int i;
 		for (i=0; i<suffix_qty; ++i) {
@@ -726,32 +726,18 @@ mime :: guess_part_type_from_filename (const char   * filename,
 
 namespace
 {
-  void handle_uu_and_yenc_in_text_plain (GMimeObject **part)
+  void handle_uu_and_yenc_in_text_plain_cb (GMimeObject *parent, GMimeObject *part, gpointer data)
   {
-    // if the part is a multipart, check its subparts
-    if (GMIME_IS_MULTIPART (*part)) {
-      GMimeMultipart *multipart = (GMimeMultipart *) *part;
-      int count = g_mime_multipart_get_count(multipart);
-      int i;
-      for (i = 0; i < count; i++) {
-        GMimeObject * subpart = g_mime_multipart_remove_at (multipart, i);
-        //work around possible gmime bug
-        if(!subpart)
-          continue;
-        handle_uu_and_yenc_in_text_plain (&subpart);
-        g_mime_multipart_insert (multipart, i, subpart);
-        g_object_unref (subpart);
-      }
+    if(!part)
       return;
-    }
-
+    
     // we assume that inlined yenc and uu are only in text/plain blocks
-    GMimeContentType * content_type = g_mime_object_get_content_type (*part);
+    GMimeContentType * content_type = g_mime_object_get_content_type (part);
     if (!g_mime_content_type_is_type (content_type, "text", "plain"))
       return;
 
     // get this part's content
-    GMimeDataWrapper * content = g_mime_part_get_content_object (GMIME_PART (*part));
+    GMimeDataWrapper * content = g_mime_part_get_content_object (GMIME_PART (part));
     if (!content)
       return;
 
@@ -770,21 +756,25 @@ namespace
     {
       GMimeMultipart * multipart = g_mime_multipart_new_with_subtype ("mixed");
 		
+      const char * type = "text";
+      const char * subtype = "plain";
+      const TempPart *tmp_part;
+      const char *filename;
+      GMimePart *subpart;
+      GMimeStream *subpart_stream;
       foreach (temp_parts_t, parts, it)
       {
-        const TempPart * tmp_part (*it);
-			
-        const char * type = "text";
-        const char * subtype = "plain";
-        const char * filename = tmp_part->filename;
+        tmp_part = *it;
+        filename = tmp_part->filename;
+
         if (filename && *filename)
           mime::guess_part_type_from_filename (filename, &type, &subtype);
 
-        GMimePart * subpart = g_mime_part_new_with_type (type, subtype);
+        subpart = g_mime_part_new_with_type (type, subtype);
         if (filename && *filename)
           g_mime_part_set_filename (subpart, filename);
 
-        GMimeStream * subpart_stream = tmp_part->stream;
+        subpart_stream = tmp_part->stream;
         content = g_mime_data_wrapper_new_with_stream (subpart_stream, GMIME_CONTENT_ENCODING_DEFAULT);
         g_mime_part_set_content_object (subpart, content);
         g_mime_multipart_add (GMIME_MULTIPART (multipart), GMIME_OBJECT (subpart));
@@ -794,8 +784,17 @@ namespace
       }
 		
       // replace the old part with the new multipart
-      g_object_unref (*part);
-      *part = GMIME_OBJECT (multipart);
+      if(GMIME_IS_MULTIPART(parent))
+      {
+        GMimeMultipart *mp=GMIME_MULTIPART (parent);
+        int index=g_mime_multipart_index_of (mp,part);
+        g_mime_multipart_remove_at (mp,index);
+        g_object_unref (part);
+        g_mime_multipart_insert (mp,index,(GMimeObject*)multipart);
+      } else if(GMIME_IS_MESSAGE(parent))
+      {
+        g_mime_message_set_mime_part((GMimeMessage*)parent,(GMimeObject*)multipart);
+      } 
     }
 
     foreach (temp_parts_t, parts, it)
@@ -835,19 +834,22 @@ mime :: construct_message (GMimeStream  ** istreams,
   {
     GMimeStream * cat = g_mime_stream_cat_new ();
     
+    GMimeMessage * message;
+    GMimeDataWrapper * wrapper;
+    GMimeStream * stream;
     for (int i=0; i<qty; ++i)
     {
-      GMimeMessage * message = messages[i];
-      GMimeDataWrapper * wrapper = g_mime_part_get_content_object (GMIME_PART(message->mime_part));
-      GMimeStream * stream = g_mime_data_wrapper_get_stream (wrapper);
+      message = messages[i];
+      wrapper = g_mime_part_get_content_object (GMIME_PART(message->mime_part));
+      stream = g_mime_data_wrapper_get_stream (wrapper);
       g_mime_stream_reset (stream);
       g_mime_stream_cat_add_source (GMIME_STREAM_CAT (cat), stream);
       g_object_unref (stream);
       g_object_unref (wrapper);
     }
 
-    GMimeMessage * message = messages[0];
-    GMimeDataWrapper * wrapper = g_mime_part_get_content_object (GMIME_PART(message->mime_part));
+    message = messages[0];
+    wrapper = g_mime_part_get_content_object (GMIME_PART(message->mime_part));
     g_mime_stream_reset (cat);
     g_mime_data_wrapper_set_stream (wrapper, cat);
     g_object_unref (wrapper);
@@ -860,7 +862,8 @@ mime :: construct_message (GMimeStream  ** istreams,
 
   // pick out yenc and uuenc data in text/plain messages
   if (retval != NULL)
-    handle_uu_and_yenc_in_text_plain (&retval->mime_part);
+    g_mime_message_foreach(retval,handle_uu_and_yenc_in_text_plain_cb,NULL);
+    //handle_uu_and_yenc_in_text_plain (&retval->mime_part);
 
   // cleanup
   g_free (messages);
@@ -1027,66 +1030,66 @@ handle_multipart_mixed (GMimeMultipart *multipart, gboolean *is_html);
 GMimeObject *
 handle_multipart_alternative (GMimeMultipart *multipart, gboolean *is_html)
 {
-        GMimeObject *mime_part, *text_part = NULL;
-        GMimeContentType *type;
-        int count = g_mime_multipart_get_count (multipart);
+  GMimeObject *mime_part, *text_part = NULL;
+  GMimeContentType *type;
+  int count = g_mime_multipart_get_count (multipart);
 
-        for (int i = 0; i < count; ++i) {
-                mime_part = g_mime_multipart_get_part (multipart, i);
+  for (int i = 0; i < count; ++i) {
+    mime_part = g_mime_multipart_get_part (multipart, i);
 
-                type = g_mime_object_get_content_type (mime_part);
-                if (g_mime_content_type_is_type (type, "text", "*")) {
-                        if (!text_part || !g_ascii_strcasecmp (type->subtype, "plain")) {
-                                *is_html = !g_ascii_strcasecmp (type->subtype, "html");
-                                text_part = mime_part;
-                        }
-                }
-        }
+    type = g_mime_object_get_content_type (mime_part);
+    if (g_mime_content_type_is_type (type, "text", "*")) {
+      if (!text_part || !g_ascii_strcasecmp (type->subtype, "plain")) {
+        *is_html = !g_ascii_strcasecmp (type->subtype, "html");
+        text_part = mime_part;
+      }
+    }
+  }
 
-        return text_part;
+  return text_part;
 }
 
 GMimeObject *
 handle_multipart_mixed (GMimeMultipart *multipart, gboolean *is_html)
 {
-        GMimeObject *mime_part, *text_part = NULL;
-        GMimeContentType *type, *first_type = NULL;
-        int count = g_mime_multipart_get_count (multipart);
+  GMimeObject *mime_part, *text_part = NULL;
+  GMimeContentType *type, *first_type = NULL;
+  int count = g_mime_multipart_get_count (multipart);
 
-        for (int i = 0; i < count; ++i) {
-                mime_part = g_mime_multipart_get_part (multipart, i);
+  for (int i = 0; i < count; ++i) {
+    mime_part = g_mime_multipart_get_part (multipart, i);
 
-                type = g_mime_object_get_content_type (mime_part);
-                if (GMIME_IS_MULTIPART (mime_part)) {
-                        multipart = GMIME_MULTIPART (mime_part);
-                        if (g_mime_content_type_is_type (type, "multipart", "alternative")) {
-                                mime_part = handle_multipart_alternative (multipart, is_html);
-                                if (mime_part)
-                                        return mime_part;
-                        } else {
-                                mime_part = handle_multipart_mixed (multipart, is_html);
-                                if (mime_part && !text_part)
-                                        text_part = mime_part;
-                        }
-                } else if (g_mime_content_type_is_type (type, "text", "*")) {
-                        if (!g_ascii_strcasecmp (type->subtype, "plain")) {
-                                /* we got what we came for */
-                                *is_html = !g_ascii_strcasecmp (type->subtype, "html");
-                                return mime_part;
-                        }
+    type = g_mime_object_get_content_type (mime_part);
+    if (GMIME_IS_MULTIPART (mime_part)) {
+      multipart = GMIME_MULTIPART (mime_part);
+      if (g_mime_content_type_is_type (type, "multipart", "alternative")) {
+        mime_part = handle_multipart_alternative (multipart, is_html);
+        if (mime_part)
+          return mime_part;
+      } else {
+        mime_part = handle_multipart_mixed (multipart, is_html);
+        if (mime_part && !text_part)
+          text_part = mime_part;
+      }
+    } else if (g_mime_content_type_is_type (type, "text", "*")) {
+      if (!g_ascii_strcasecmp (type->subtype, "plain")) {
+        /* we got what we came for */
+        *is_html = !g_ascii_strcasecmp (type->subtype, "html");
+        return mime_part;
+      }
 
-                        /* if we haven't yet found a text part or if it is a type we can
- *                          * understand and it is the first of that type, save it */
-                        if (!text_part || (!g_ascii_strcasecmp (type->subtype, "plain") && (first_type &&
-                                           g_ascii_strcasecmp (type->subtype, first_type->subtype) != 0))) {
-                                *is_html = !g_ascii_strcasecmp (type->subtype, "html");
-                                text_part = mime_part;
-                                first_type = type;
-                        }
-                }
-        }
+      /* if we haven't yet found a text part or if it is a type we can
+*                          * understand and it is the first of that type, save it */
+      if (!text_part || (!g_ascii_strcasecmp (type->subtype, "plain") && (first_type &&
+           g_ascii_strcasecmp (type->subtype, first_type->subtype) != 0))) {
+        *is_html = !g_ascii_strcasecmp (type->subtype, "html");
+        text_part = mime_part;
+        first_type = type;
+      }
+    }
+  }
 
-        return text_part;
+  return text_part;
 }
 
 }
@@ -1099,71 +1102,72 @@ namespace
 char *
 pan_g_mime_part_get_content (const GMimePart *mime_part, size_t *len)
 {
-        char *retval = NULL;
+  char *retval = NULL;
 
-        g_return_val_if_fail (GMIME_IS_PART (mime_part), NULL);
+  g_return_val_if_fail (GMIME_IS_PART (mime_part), NULL);
 
-        if (!mime_part->content || !mime_part->content->stream) {
-                g_warning ("no content set on this mime part");
-                return NULL;
-        }
+  if (!mime_part->content || !mime_part->content->stream) {
+    g_warning ("no content set on this mime part");
+    return NULL;
+  }
 
-        GMimeDataWrapper *wrapper = g_mime_part_get_content_object(mime_part);
-        GMimeStream *stream = g_mime_stream_mem_new();
-        g_mime_data_wrapper_write_to_stream (wrapper, stream);
-        GByteArray *bytes=g_mime_stream_mem_get_byte_array((GMimeStreamMem*)stream);
-        *len=bytes->len;
-        if (bytes->len)
-          retval=(char*)g_memdup(bytes->data,bytes->len);
-        g_object_unref(stream);
+  GMimeDataWrapper *wrapper = g_mime_part_get_content_object(mime_part);
+  GMimeStream *stream = g_mime_stream_mem_new();
+  g_mime_data_wrapper_write_to_stream (wrapper, stream);
+  GByteArray *bytes=g_mime_stream_mem_get_byte_array((GMimeStreamMem*)stream);
+  *len=bytes->len;
+  if (bytes->len)
+    retval=(char*)g_memdup(bytes->data,bytes->len);
+  g_object_unref(stream);
 
-        return retval;
+  return retval;
 }
 }
 
 char *pan::pan_g_mime_message_get_body (GMimeMessage *message, gboolean *is_html)
 {
-        GMimeObject *mime_part = NULL;
-        GMimeContentType *type;
-        GMimeMultipart *multipart;
-        char *body = NULL;
-        size_t len = 0;
+  GMimeObject *mime_part = NULL;
+  GMimeContentType *type;
+  GMimeMultipart *multipart;
+  char *body = NULL;
+  size_t len = 0;
 
-        g_return_val_if_fail (GMIME_IS_MESSAGE (message), NULL);
-        g_return_val_if_fail (is_html != NULL, NULL);
+  g_return_val_if_fail (GMIME_IS_MESSAGE (message), NULL);
+  g_return_val_if_fail (is_html != NULL, NULL);
 
-        type = g_mime_object_get_content_type (message->mime_part);
-        if (GMIME_IS_MULTIPART (message->mime_part)) {
-                /* let's see if we can find a body in the multipart */
-                multipart = GMIME_MULTIPART (message->mime_part);
-                if (g_mime_content_type_is_type (type, "multipart", "alternative"))
-                        mime_part = handle_multipart_alternative (multipart, is_html);
-                else
-                        mime_part = handle_multipart_mixed (multipart, is_html);
-        } else if (g_mime_content_type_is_type (type, "text", "*")) {
-                /* this *has* to be the message body */
-                if (g_mime_content_type_is_type (type, "text", "html"))
-                        *is_html = TRUE;
-                else
-                        *is_html = FALSE;
-                mime_part = message->mime_part;
-        }
+  type = g_mime_object_get_content_type (message->mime_part);
+  if (GMIME_IS_MULTIPART (message->mime_part)) {
+    /* let's see if we can find a body in the multipart */
+    multipart = GMIME_MULTIPART (message->mime_part);
+    if (g_mime_content_type_is_type (type, "multipart", "alternative"))
+      mime_part = handle_multipart_alternative (multipart, is_html);
+    else
+      mime_part = handle_multipart_mixed (multipart, is_html);
+  } else if (g_mime_content_type_is_type (type, "text", "*")) {
+    /* this *has* to be the message body */
+    if (g_mime_content_type_is_type (type, "text", "html"))
+      *is_html = TRUE;
+    else
+      *is_html = FALSE;
+    mime_part = message->mime_part;
+  }
 
-        if (mime_part != NULL) {
-                body = pan_g_mime_part_get_content (GMIME_PART (mime_part), &len);
-        }
+  if (mime_part != NULL) {
+    body = pan_g_mime_part_get_content (GMIME_PART (mime_part), &len);
+  }
 
-        return body;
+  return body;
 }
 
 void pan::pan_g_mime_message_add_recipients_from_string (GMimeMessage *message, GMimeRecipientType type, const char *string)
 {
-        InternetAddressList *addrlist;
-        if ((addrlist = internet_address_list_parse_string (string))) {
-        	for (int i = 0; i < internet_address_list_length (addrlist); ++i) {
-                	InternetAddress *ia = internet_address_list_get_address (addrlist, i);
-                	if (INTERNET_ADDRESS_IS_MAILBOX(ia))
-				g_mime_message_add_recipient (message, type, internet_address_get_name(ia), internet_address_mailbox_get_addr(INTERNET_ADDRESS_MAILBOX(ia)));
-		}
-        }
+  InternetAddressList *addrlist;
+  if ((addrlist = internet_address_list_parse_string (string))) {
+    InternetAddress *ia;
+    for (int i = 0; i < internet_address_list_length (addrlist); ++i) {
+      ia = internet_address_list_get_address (addrlist, i);
+      if (INTERNET_ADDRESS_IS_MAILBOX(ia))
+        g_mime_message_add_recipient (message, type, internet_address_get_name(ia), internet_address_mailbox_get_addr(INTERNET_ADDRESS_MAILBOX(ia)));
+    }
+  }
 }
