@@ -106,14 +106,22 @@ Queue :: get_pool (const Quark& servername)
 void
 Queue :: upkeep ()
 {
+  const tasks_t tmp (_tasks.begin(), _tasks.end());
+  // remove completed tasks.
+  foreach_const (tasks_t, tmp, it) {
+    Task * task  (*it);
+    const Task::State& state (task->get_state());
+    if (state._work==Task::COMPLETED || _removing.count(task))
+      remove_task (task);
+  }
+
   // maybe save the task list.
   // only do it once in awhile to prevent thrashing.
-  const tasks_t tmp (_tasks.begin(), _tasks.end());
   const time_t now (time(0));
   if (_needs_saving && _last_time_saved<(now-10)) {
     _archive.save_tasks (tmp);
     _needs_saving = false;
-    _last_time_saved = now;
+    _last_time_saved = time(0);
   }
 
   // do upkeep on the first queued task.
@@ -127,14 +135,6 @@ Queue :: upkeep ()
       process_task (task);
       break;
     }
-  }
-
-  // remove completed tasks.
-  foreach_const (tasks_t, tmp, it) {
-    Task * task  (*it);
-    const Task::State& state (task->get_state());
-    if (state._work==Task::COMPLETED || _removing.count(task))
-      remove_task (task);
   }
 
   // upkeep on running tasks... this lets us pop open
