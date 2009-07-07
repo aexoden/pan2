@@ -20,31 +20,44 @@
 #ifndef __MemChunk_h__
 #define __MemChunk_h__
 
+#include <cstring>
+
 namespace pan {
   template <class T> class MemChunk
   {
     public:
       void push_back(const T& src)
       {
-        if (head==0) grow();
-        phead=reinterpret_cast<T*>(head);
-        head=head->next;
-        new(phead) T(src);
+        if (chunks->count==nelem) grow();
+        T* thead=head;
+        new(thead) T(src);
+        phead=thead;
+        ++head;
+        ++chunks->count;
       }
       T& back()
       {
         return *phead;
       }
       
-      MemChunk():chunks(0),head(0),phead(0) {};
+      MemChunk():chunks(0),head(0),phead(0),nelem(Chunk::size/sizeof(T))
+      {grow();}
+      
       ~MemChunk()
       {
-        Chunk *p=chunks;
+        Chunk *p;
+        T *t;
+        int i;
         while(chunks!=0)
         {
+          t=reinterpret_cast<T*>(chunks->mem);
+          for (i=0;i<chunks->count;i++)
+          {
+            t[i].~T();
+          }
+          p=chunks;
           chunks=chunks->next;
           delete p;
-          p=chunks;
         }
       }
       
@@ -53,36 +66,30 @@ namespace pan {
       template<class U> MemChunk(MemChunk<U>&);
       MemChunk* operator=(const MemChunk&);
       
-      struct Link {Link* next;};
       struct Chunk {
-        enum {size=8*1024-sizeof(Chunk*)};
+        enum {size=8*1024-sizeof(Chunk*)-sizeof(int)-32};
         char mem[size];
         Chunk *next;
+        int count;
       };
 
       void grow()
       {
-        const int nelem=Chunk::size/sizeof(T);
         Chunk *c=new Chunk;
-        char *p,*n=0;
+        T *p,*n=0;
         int i;
         
-        for (p=c->mem, i=0;i<nelem-1;i++)
-        {
-          n=p+sizeof(T);
-          reinterpret_cast<Link*>(p)->next=reinterpret_cast<Link*>(n);
-          p=n;
-        }
-        reinterpret_cast<Link*>(p)->next=0;
+        memset(c->mem,0,Chunk::size);
         
         c->next=chunks;
+        c->count=0;
         chunks=c;
-        head=reinterpret_cast<Link*>(c->mem);
+        head=reinterpret_cast<T*>(c->mem);
       };
       
       Chunk *chunks;
-      Link *head;
-      T *phead;
+      T *phead, *head;
+      const int nelem;
   };
 
 }
