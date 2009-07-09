@@ -28,19 +28,24 @@ namespace pan {
     public:
       void push_back(const T& src)
       {
-        if (chunks->count==nelem) grow();
+        if (count==nelem) grow();
         T* thead=head;
         new(thead) T(src);
         phead=thead;
         ++head;
-        ++chunks->count;
+        ++count;
       }
       T& back()
       {
         return *phead;
       }
+      T* alloc()
+      {
+        push_back(T());
+        return phead;
+      }
       
-      MemChunk():chunks(0),head(0),phead(0),nelem(Chunk::size/sizeof(T))
+      MemChunk():chunks(0),head(0),phead(0),nelem(Chunk::size/sizeof(T)),count(0)
       {grow();}
       
       ~MemChunk()
@@ -48,10 +53,20 @@ namespace pan {
         Chunk *p;
         T *t;
         int i;
+        //special handling for first chunk since it's not full
+        t=reinterpret_cast<T*>(chunks->mem);
+        for (i=0;i<count;i++)
+        {
+          t[i].~T();
+        }
+        p=chunks;
+        chunks=chunks->next;
+        delete p;
+        
         while(chunks!=0)
         {
           t=reinterpret_cast<T*>(chunks->mem);
-          for (i=0;i<chunks->count;i++)
+          for (i=0;i<nelem;i++)
           {
             t[i].~T();
           }
@@ -67,10 +82,9 @@ namespace pan {
       MemChunk* operator=(const MemChunk&);
       
       struct Chunk {
-        enum {size=8*1024-sizeof(Chunk*)-sizeof(int)-32};
+        enum {size=16*1024-sizeof(Chunk*)-32};
         char mem[size];
         Chunk *next;
-        int count;
       };
 
       void grow()
@@ -82,7 +96,7 @@ namespace pan {
         memset(c->mem,0,Chunk::size);
         
         c->next=chunks;
-        c->count=0;
+        count=0;
         chunks=c;
         head=reinterpret_cast<T*>(c->mem);
       };
@@ -90,6 +104,7 @@ namespace pan {
       Chunk *chunks;
       T *phead, *head;
       const int nelem;
+      int count;
   };
 
 }

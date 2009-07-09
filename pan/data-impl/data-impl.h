@@ -443,7 +443,7 @@ namespace pan
           const Quark _group;
           DataImpl & _data;
           nodes_t _nodes;
-          std::deque<ArticleNode> _node_chunk;
+          MemChunk<ArticleNode> _node_chunk;
           FilterInfo _filter;
           Data::ShowType _show_type;
           struct NodeMidCompare;
