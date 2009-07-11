@@ -64,7 +64,7 @@ namespace pan
     private AdaptableSet<Task*, TaskWeakOrdering>::Listener
   {
     public:
-      Queue (ServerInfo&, TaskArchive&, Socket::Creator*, WorkerPool&, bool online);
+      Queue (ServerInfo&, TaskArchive&, Socket::Creator*, WorkerPool&, bool online, int nzb_delay);
       virtual ~Queue ();
 
       typedef std::vector<Task*> tasks_t;
@@ -188,6 +188,7 @@ namespace pan
       WorkerPool & _worker_pool;
       Decoder _decoder;
       Task * _decoder_task;
+      int nzb_file_delay;
 
     protected:
       virtual void fire_tasks_added  (int index, int count);

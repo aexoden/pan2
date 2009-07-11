@@ -279,7 +279,8 @@ main (int argc, char *argv[])
     // instantiate the queue...
     WorkerPool worker_pool (4, true);
     GIOChannelSocket::Creator socket_creator;
-    Queue queue (data, data, &socket_creator, worker_pool, prefs.get_flag("work-online", true));
+    Queue queue (data, data, &socket_creator, worker_pool, prefs.get_flag("work-online", true),
+      prefs.get_int("tasks-nzb-delay",10));
     g_timeout_add (5000, queue_upkeep_timer_cb, &queue);
 
     if (nzb || !groups.empty())
