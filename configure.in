@@ -17,8 +17,8 @@ dnl GtkSpell is optional: GTKSPELL_REQUIRED refers to the minimum version
 dnl needed if you want to build Pan with spellchecking in the Post window.
 
 PCRE_REQUIRED=5.0
-GLIB_REQUIRED=2.4.0
-GMIME_REQUIRED=2.1.9
+GLIB_REQUIRED=2.12.0
+GMIME_REQUIRED=2.4.0
 GTK_REQUIRED=2.4.0
 GTKSPELL_REQUIRED=2.0.7
 AC_SUBST(PCRE_REQUIRED)
