@@ -1115,9 +1115,12 @@ pan_g_mime_part_get_content (const GMimePart *mime_part, size_t *len)
   GMimeStream *stream = g_mime_stream_mem_new();
   g_mime_data_wrapper_write_to_stream (wrapper, stream);
   GByteArray *bytes=g_mime_stream_mem_get_byte_array((GMimeStreamMem*)stream);
-  *len=bytes->len;
+  *len=bytes->len+1;
   if (bytes->len)
-    retval=(char*)g_memdup(bytes->data,bytes->len);
+  {
+    retval=(char*)g_malloc0(bytes->len+1);
+    memcpy(retval,bytes->data,bytes->len);
+  }
   g_object_unref(stream);
 
   return retval;
