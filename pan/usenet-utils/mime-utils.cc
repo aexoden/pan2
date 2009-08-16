@@ -360,7 +360,7 @@ namespace
 namespace
 {
   guint
-  stream_readln (GMimeStream *stream, GByteArray *line, off_t* startpos)
+  stream_readln (GMimeStream *stream, GByteArray *line, gint64* startpos)
   {
     char linebuf[1024];
     gssize len;
@@ -443,12 +443,13 @@ namespace
     return 0;
   }
 
-  void append_if_not_present (temp_parts_t& parts, TempPart * part)
+  bool append_if_not_present (temp_parts_t& parts, TempPart * part)
   {
     foreach (temp_parts_t, parts, it)
       if (part == *it)
-        return;
+        return false;
     parts.push_back (part);
+    return true;
   }
 
   void apply_source_and_maybe_filter (TempPart * part, GMimeStream * s)
@@ -470,22 +471,23 @@ namespace
 				   part->stream : part->filter_stream);
     g_object_unref (s);
   }
-}
 
-static void
+bool
 separate_encoded_parts (GMimeStream  * istream,
-                        temp_parts_t & appendme)
+                        temp_parts_t & appendme,
+                        temp_parts_t & master)
 {
 	TempPart * cur = NULL;
 	EncType type = ENC_PLAIN;
 	GByteArray * line;
 	gboolean yenc_looking_for_part_line = FALSE;
-	off_t linestart_pos = 0;
-	off_t sub_begin = 0;
+	gint64 linestart_pos = 0;
+	gint64 sub_begin = 0;
 	guint line_len;
+  bool found=false;
 
 	/* sanity clause */
-	pan_return_if_fail (istream!=NULL);
+	pan_return_val_if_fail (istream!=NULL,false);
 
 	sub_begin = 0;
 	line = g_byte_array_sized_new (4096);
@@ -510,18 +512,20 @@ separate_encoded_parts (GMimeStream  * istream,
 					gulong mode = 0ul;
 					char * filename = NULL;
 
+          found=true;
 					// flush the current entry
 					if (cur != NULL) {
 						GMimeStream * s = g_mime_stream_substream (istream, sub_begin, linestart_pos);
   						apply_source_and_maybe_filter (cur, s);
-						append_if_not_present (appendme, cur);
+            if ( append_if_not_present (master, cur) )
+              append_if_not_present (appendme, cur);
 						cur = NULL;
 					}
 
 					// start a new section (or, if filename matches, continue an existing one)
 					sub_begin = linestart_pos;
 					uu_parse_begin_line (line_pstr, &filename, &mode);
-  				cur = find_filename_part (appendme, filename);
+  				cur = find_filename_part (master, filename);
           if (cur)
 						g_free (filename);
 					else
@@ -529,11 +533,13 @@ separate_encoded_parts (GMimeStream  * istream,
 				}
 				else if (yenc_is_beginning_line (line_str))
 				{
+          found=true;
 					// flush the current entry
 					if (cur != NULL) {
 						GMimeStream * s = g_mime_stream_substream (istream, sub_begin, linestart_pos);
   						apply_source_and_maybe_filter (cur, s);
-						append_if_not_present (appendme, cur);
+            if ( append_if_not_present (master, cur) )
+              append_if_not_present (appendme, cur);
 						cur = NULL;
 					}
 					sub_begin = linestart_pos;
@@ -542,7 +548,7 @@ separate_encoded_parts (GMimeStream  * istream,
 					char * fname;
 					int line_len, attach_size, part;
 					yenc_parse_begin_line (line_str, &fname, &line_len, &attach_size, &part);
-					cur = find_filename_part (appendme, fname);
+					cur = find_filename_part (master, fname);
 					if (cur) {
 						g_free (fname);
             g_mime_filter_yenc_set_state (GMIME_FILTER_YENC (cur->filter),
@@ -573,7 +579,8 @@ separate_encoded_parts (GMimeStream  * istream,
 						sub_begin = linestart_pos;
 					stream = g_mime_stream_substream (istream, sub_begin, linestart_pos+line_len);
           apply_source_and_maybe_filter (cur, stream);
-					append_if_not_present (appendme, cur);
+					if( append_if_not_present (master, cur) )
+            append_if_not_present (appendme, cur);
 
 					cur = NULL;
 					type = ENC_PLAIN;
@@ -607,7 +614,8 @@ separate_encoded_parts (GMimeStream  * istream,
 					GMimeStream * stream = g_mime_stream_substream (istream, sub_begin, linestart_pos+line_len);
           apply_source_and_maybe_filter (cur, stream);
 					yenc_parse_end_line (line_str, &cur->y_size, NULL, &cur->y_pcrc, &cur->y_crc);
-					append_if_not_present (appendme, cur);
+					if( append_if_not_present (master, cur) )
+            append_if_not_present (appendme, cur);
 
 					cur = NULL;
 					type = ENC_PLAIN;
@@ -640,12 +648,16 @@ separate_encoded_parts (GMimeStream  * istream,
 		if (cur->valid_lines < 10u)
 			cur->type = ENC_PLAIN;
 
-		append_if_not_present (appendme, cur);
+    if( append_if_not_present (master, cur) )
+      append_if_not_present (appendme, cur);
 		cur = NULL;
 		type = ENC_PLAIN;
 	}
 
 	g_byte_array_free (line, TRUE);
+  return found;
+}
+
 }
 
 void
@@ -726,6 +738,26 @@ mime :: guess_part_type_from_filename (const char   * filename,
 
 namespace
 {
+  void
+  ptr_array_insert (GPtrArray *array, guint index, gpointer object)
+  {
+    unsigned char *dest, *src;
+    guint n;
+    
+    g_ptr_array_set_size (array, array->len + 1);
+    
+    if (index != array->len) {
+      /* need to move items down */
+      dest = ((unsigned char *) array->pdata) + (sizeof (void *) * (index + 1));
+      src = ((unsigned char *) array->pdata) + (sizeof (void *) * index);
+      n = array->len - index - 1;
+      
+      g_memmove (dest, src, (sizeof (void *) * n));
+    }
+    
+    array->pdata[index] = object;
+  }
+  
   void handle_uu_and_yenc_in_text_plain_cb (GMimeObject *parent, GMimeObject *part, gpointer data)
   {
     if(!part)
@@ -748,58 +780,105 @@ namespace
 
     // break it into separate parts for text, uu, and yenc pieces.
     temp_parts_t parts;
-    separate_encoded_parts (istream, parts);
+    bool split=separate_encoded_parts (istream, parts, *((temp_parts_t*)data) );
     g_mime_stream_reset (istream);
 
     // split?
-    if (parts.size()>1 || (parts.size()==1 && parts.front()->type!=ENC_PLAIN))
+    if(split)
     {
-      GMimeMultipart * multipart = g_mime_multipart_new_with_subtype ("mixed");
-		
-      const char * type = "text";
-      const char * subtype = "plain";
-      const TempPart *tmp_part;
-      const char *filename;
-      GMimePart *subpart;
-      GMimeStream *subpart_stream;
-      foreach (temp_parts_t, parts, it)
-      {
-        tmp_part = *it;
-        filename = tmp_part->filename;
-
-        if (filename && *filename)
-          mime::guess_part_type_from_filename (filename, &type, &subtype);
-
-        subpart = g_mime_part_new_with_type (type, subtype);
-        if (filename && *filename)
-          g_mime_part_set_filename (subpart, filename);
-
-        subpart_stream = tmp_part->stream;
-        content = g_mime_data_wrapper_new_with_stream (subpart_stream, GMIME_CONTENT_ENCODING_DEFAULT);
-        g_mime_part_set_content_object (subpart, content);
-        g_mime_multipart_add (GMIME_MULTIPART (multipart), GMIME_OBJECT (subpart));
-
-        g_object_unref (content);
-        g_object_unref (subpart);
-      }
-		
-      // replace the old part with the new multipart
-      if(GMIME_IS_MULTIPART(parent))
-      {
+      //this part was completely folded into a previous part
+      //so delete it
+      if(parts.size()==0) {
         GMimeMultipart *mp=GMIME_MULTIPART (parent);
         int index=g_mime_multipart_index_of (mp,part);
-        g_mime_multipart_remove_at (mp,index);
-        g_object_unref (part);
-        g_mime_multipart_insert (mp,index,(GMimeObject*)multipart);
-      } else if(GMIME_IS_MESSAGE(parent))
+        if(index>0)
+          g_mime_multipart_remove_at (mp,index);
+        g_object_unref(part);
+      }
+      else
       {
-        g_mime_message_set_mime_part((GMimeMessage*)parent,(GMimeObject*)multipart);
-      } 
+        GMimeMultipart * multipart = g_mime_multipart_new_with_subtype ("mixed");
+      
+        const char * type = "text";
+        const char * subtype = "plain";
+        const TempPart *tmp_part;
+        const char *filename;
+        GMimePart *subpart;
+        GMimeStream *subpart_stream;
+        foreach (temp_parts_t, parts, it)
+        {
+          tmp_part = *it;
+          filename = tmp_part->filename;
+
+          if (filename && *filename)
+            mime::guess_part_type_from_filename (filename, &type, &subtype);
+
+          subpart = g_mime_part_new_with_type (type, subtype);
+          if (filename && *filename)
+            g_mime_part_set_filename (subpart, filename);
+
+          subpart_stream = tmp_part->stream;
+          content = g_mime_data_wrapper_new_with_stream (subpart_stream, GMIME_CONTENT_ENCODING_DEFAULT);
+          g_mime_part_set_content_object (subpart, content);
+          g_mime_multipart_add (GMIME_MULTIPART (multipart), GMIME_OBJECT (subpart));
+
+          g_object_unref (content);
+          g_object_unref (subpart);
+        }
+      
+        // replace the old part with the new multipart
+        GMimeObject *newpart=GMIME_OBJECT(multipart);
+        if(parts.size()==1)
+        {
+          //only one part so no need for multipart
+          newpart=g_mime_multipart_remove_at(multipart,0);
+          g_object_unref(multipart);
+        }
+        if(GMIME_IS_MULTIPART(parent))
+        {
+          GMimeMultipart *mp=GMIME_MULTIPART (parent);
+          int index=g_mime_multipart_index_of (mp,part);
+          g_mime_multipart_remove_at (mp,index);
+          g_object_unref (part);
+          
+          //workaround gmime insert bug
+          //g_mime_multipart_insert (mp,index,newpart);
+          {
+            ptr_array_insert(mp->children,index,newpart);
+            g_object_ref(newpart);
+          }
+        }
+        else if(GMIME_IS_MESSAGE(parent))
+        {
+          g_mime_message_set_mime_part((GMimeMessage*)parent,newpart);
+        }
+        g_object_unref(newpart);
+      }
     }
 
-    foreach (temp_parts_t, parts, it)
-      delete *it;
     g_object_unref (istream);
+  }
+}
+
+namespace{
+  struct temp_p {
+    GMimeObject *parent,*part;
+    
+    temp_p(GMimeObject *p, GMimeObject *par):parent(p),part(par) {};
+  };
+  typedef std::vector<temp_p> temp_p_t;
+
+  void find_text_cb(GMimeObject *parent, GMimeObject *part, gpointer data)
+  {
+    if(!GMIME_IS_PART(part))
+      return;
+      
+    temp_p_t *v( (temp_p_t *) data);
+    // we assume that inlined yenc and uu are only in text/plain blocks
+    GMimeContentType * content_type = g_mime_object_get_content_type (part);
+    if (!g_mime_content_type_is_type (content_type, "text", "plain"))
+      return;
+    v->push_back(temp_p(parent,part) );
   }
 }
 
@@ -829,31 +908,18 @@ mime :: construct_message (GMimeStream  ** istreams,
     messages[i] = g_mime_parser_construct_message (parser);
   }
   g_object_unref (parser);
-
+  
   if (qty > 1) // fold multiparts together
   {
-    GMimeStream * cat = g_mime_stream_cat_new ();
+    GMimeMultipart * mp = g_mime_multipart_new ();
     
-    GMimeMessage * message;
-    GMimeDataWrapper * wrapper;
-    GMimeStream * stream;
     for (int i=0; i<qty; ++i)
     {
-      message = messages[i];
-      wrapper = g_mime_part_get_content_object (GMIME_PART(message->mime_part));
-      stream = g_mime_data_wrapper_get_stream (wrapper);
-      g_mime_stream_reset (stream);
-      g_mime_stream_cat_add_source (GMIME_STREAM_CAT (cat), stream);
-      g_object_unref (stream);
-      g_object_unref (wrapper);
+      g_mime_multipart_add(mp,g_mime_message_get_mime_part(messages[i]) );
     }
 
-    message = messages[0];
-    wrapper = g_mime_part_get_content_object (GMIME_PART(message->mime_part));
-    g_mime_stream_reset (cat);
-    g_mime_data_wrapper_set_stream (wrapper, cat);
-    g_object_unref (wrapper);
-    g_object_unref (cat);
+    g_mime_message_set_mime_part(messages[0],GMIME_OBJECT(mp));
+    g_object_unref(mp);
   }
 
   retval = messages[0];
@@ -861,11 +927,21 @@ mime :: construct_message (GMimeStream  ** istreams,
     g_object_unref (messages[i]);
 
   // pick out yenc and uuenc data in text/plain messages
+  temp_p_t partslist;
+  temp_parts_t master;
   if (retval != NULL)
-    g_mime_message_foreach(retval,handle_uu_and_yenc_in_text_plain_cb,NULL);
-    //handle_uu_and_yenc_in_text_plain (&retval->mime_part);
-
+    g_mime_message_foreach(retval,find_text_cb,&partslist);
+  foreach(temp_p_t, partslist, it)
+  {
+    temp_p &data(*it);
+    handle_uu_and_yenc_in_text_plain_cb(data.parent,data.part,&master);
+  }
+  
   // cleanup
+  foreach (temp_parts_t, master, it)
+  {
+    delete *it;
+  }
   g_free (messages);
   return retval;
 }
