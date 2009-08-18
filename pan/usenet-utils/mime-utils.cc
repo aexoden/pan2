@@ -501,14 +501,6 @@ separate_encoded_parts (GMimeStream  * istream, sep_state &state)
 	sub_begin = 0;
 	line = g_byte_array_sized_new (4096);
   char *line_str, *pch;
-  // continue an incomplete uu decode
-  if(state.uu_temp != NULL)
-  {
-    type=ENC_UU;
-    cur=state.uu_temp;
-    sub_begin=-1;
-    found=true;
-  }
   
 	while ((line_len = stream_readln (istream, line, &linestart_pos)))
 	{
@@ -582,6 +574,23 @@ separate_encoded_parts (GMimeStream  * istream, sep_state &state)
 						yenc_looking_for_part_line = cur->y_part!=0;
 					}
 				}
+        else if (state.uu_temp != NULL && is_uu_line(line_str, line_len) )
+        {
+          // continue an incomplete uu decode
+          found=true;
+					// flush the current entry
+					if (cur != NULL) {
+						GMimeStream * s = g_mime_stream_substream (istream, sub_begin, linestart_pos);
+  						apply_source_and_maybe_filter (cur, s);
+            if ( append_if_not_present (master, cur) )
+              append_if_not_present (appendme, cur);
+						cur = NULL;
+					}
+					sub_begin = linestart_pos;
+          cur = state.uu_temp;
+          ++cur->valid_lines;
+          type=ENC_UU;
+        }
 				else if (cur == NULL)
 				{
 					sub_begin = linestart_pos;
