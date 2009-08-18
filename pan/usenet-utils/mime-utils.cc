@@ -472,11 +472,20 @@ namespace
     g_object_unref (s);
   }
 
+  struct sep_state
+  {
+    temp_parts_t master_list;
+    temp_parts_t current_list;
+    TempPart *uu_temp;
+    
+    sep_state():uu_temp(NULL) {};
+  };
+  
 bool
-separate_encoded_parts (GMimeStream  * istream,
-                        temp_parts_t & appendme,
-                        temp_parts_t & master)
+separate_encoded_parts (GMimeStream  * istream, sep_state &state)
 {
+  temp_parts_t& master(state.master_list);
+  temp_parts_t& appendme(state.current_list);
 	TempPart * cur = NULL;
 	EncType type = ENC_PLAIN;
 	GByteArray * line;
@@ -492,6 +501,15 @@ separate_encoded_parts (GMimeStream  * istream,
 	sub_begin = 0;
 	line = g_byte_array_sized_new (4096);
   char *line_str, *pch;
+  // continue an incomplete uu decode
+  if(state.uu_temp != NULL)
+  {
+    type=ENC_UU;
+    cur=state.uu_temp;
+    sub_begin=-1;
+    found=true;
+  }
+  
 	while ((line_len = stream_readln (istream, line, &linestart_pos)))
 	{
 		line_str = (char*) line->data;
@@ -530,6 +548,7 @@ separate_encoded_parts (GMimeStream  * istream,
 						g_free (filename);
 					else
 						cur = new TempPart (type=ENC_UU, filename);
+          state.uu_temp=cur;
 				}
 				else if (yenc_is_beginning_line (line_str))
 				{
@@ -584,6 +603,7 @@ separate_encoded_parts (GMimeStream  * istream,
 
 					cur = NULL;
 					type = ENC_PLAIN;
+          state.uu_temp=NULL;
 				}
 				else if (!is_uu_line(line_str, line_len))
 				{
@@ -779,8 +799,9 @@ namespace
     GMimeStream * istream = g_mime_stream_buffer_new (stream, GMIME_STREAM_BUFFER_BLOCK_READ);
 
     // break it into separate parts for text, uu, and yenc pieces.
-    temp_parts_t parts;
-    bool split=separate_encoded_parts (istream, parts, *((temp_parts_t*)data) );
+    sep_state &state(*(sep_state*)data);
+    temp_parts_t &parts(state.current_list);
+    bool split=separate_encoded_parts (istream, state);
     g_mime_stream_reset (istream);
 
     // split?
@@ -799,14 +820,15 @@ namespace
       {
         GMimeMultipart * multipart = g_mime_multipart_new_with_subtype ("mixed");
       
-        const char * type = "text";
-        const char * subtype = "plain";
         const TempPart *tmp_part;
         const char *filename;
         GMimePart *subpart;
         GMimeStream *subpart_stream;
         foreach (temp_parts_t, parts, it)
         {
+          // reset these for each part
+          const char * type = "text";
+          const char * subtype = "plain";
           tmp_part = *it;
           filename = tmp_part->filename;
 
@@ -928,17 +950,17 @@ mime :: construct_message (GMimeStream  ** istreams,
 
   // pick out yenc and uuenc data in text/plain messages
   temp_p_t partslist;
-  temp_parts_t master;
+  sep_state state;
   if (retval != NULL)
     g_mime_message_foreach(retval,find_text_cb,&partslist);
   foreach(temp_p_t, partslist, it)
   {
     temp_p &data(*it);
-    handle_uu_and_yenc_in_text_plain_cb(data.parent,data.part,&master);
+    handle_uu_and_yenc_in_text_plain_cb(data.parent,data.part,&state);
   }
   
   // cleanup
-  foreach (temp_parts_t, master, it)
+  foreach (temp_parts_t, state.master_list, it)
   {
     delete *it;
   }
