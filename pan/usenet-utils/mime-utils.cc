@@ -877,7 +877,7 @@ namespace
         g_object_unref(newpart);
       }
     }
-
+    parts.clear();
     g_object_unref (istream);
   }
 }
@@ -921,7 +921,7 @@ mime :: construct_message (GMimeStream  ** istreams,
   pan_return_val_if_fail (qty>=1, NULL);
   for (int i=0; i<qty; ++i)
     pan_return_val_if_fail (GMIME_IS_STREAM(istreams[i]), NULL);
-
+  
   // build the GMimeMessages
   GMimeParser * parser = g_mime_parser_new ();
   GMimeMessage ** messages = g_new (GMimeMessage*, qty);
