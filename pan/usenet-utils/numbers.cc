@@ -20,9 +20,9 @@
 #include <config.h>
 #include <cstdio>
 #include <cctype>
+#include <cstdio> // snprintf
 #include <algorithm>
 #include <glib.h>
-#include <glib/gprintf.h>
 #include <pan/general/string-view.h>
 #include "numbers.h"
 
@@ -43,7 +43,7 @@ namespace
    {
       bool merged = false;
 
-      if (0<=low && low+2<=ranges.size())
+      if (low+2<=ranges.size())
       {
          Numbers::Range & r1 = ranges[low];
          Numbers::Range & r2 = ranges[low+1];
@@ -266,9 +266,9 @@ Numbers :: to_string (std::string & str) const
       Range r (*it);
 
       if (r.low == r.high)
-        g_snprintf (buf, sizeof(buf), "%llu,", r.low);
+        g_snprintf (buf, sizeof(buf), "%"G_GUINT64_FORMAT",", r.low);
       else
-         g_snprintf (buf, sizeof(buf), "%llu-%llu,", r.low,r.high);
+         g_snprintf (buf, sizeof(buf), "%"G_GUINT64_FORMAT"-%"G_GUINT64_FORMAT",", r.low, r.high);
       str += buf;
    }
 

@@ -588,15 +588,15 @@ namespace pan
       virtual void xover_unref   (const Quark           & group);
 
       virtual uint64_t get_xover_high (const Quark & group,
-                                            const Quark & server) const;
+                                       const Quark & server) const;
 
       virtual void set_xover_high (const Quark          & group,
                                    const Quark          & server,
-                                   const uint64_t    high);
+                                   const uint64_t         high);
 
        virtual void set_xover_low (const Quark          & group,
                                    const Quark          & server,
-                                   const uint64_t    low);
+                                   const uint64_t         low);
 
 
     /**

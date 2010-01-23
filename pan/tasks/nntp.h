@@ -86,8 +86,8 @@ namespace pan
         virtual void on_nntp_group (NNTP               * nntp          UNUSED,
                                     const Quark        & group         UNUSED,
                                     unsigned long        estimated_qty UNUSED,
-                                    uint64_t        low           UNUSED,
-                                    uint64_t        high          UNUSED) {}
+                                    uint64_t             low           UNUSED,
+                                    uint64_t             high          UNUSED) {}
        };
 
       public:
@@ -130,8 +130,8 @@ namespace pan
        * command is successful or not.
        */
       void xover            (const Quark        & group,
-                             uint64_t        low,
-                             uint64_t        high,
+                             uint64_t             low,
+                             uint64_t             high,
                              Listener           * l);
 
       /**
@@ -171,7 +171,7 @@ namespace pan
        * to change groups.
        */
       void article          (const Quark        & group,
-                             uint64_t        article_number,
+                             uint64_t             article_number,
                              Listener           * l);
 
       /**

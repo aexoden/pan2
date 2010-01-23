@@ -50,7 +50,7 @@ using namespace pan;
 
 namespace
 {
-  /** 
+  /**
   * Some characters in message-ids don't work well in filenames,
   * so we transform them to a safer name.
   */

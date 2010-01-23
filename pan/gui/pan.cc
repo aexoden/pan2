@@ -16,7 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <memory> 
+#include <memory>
+#include <fstream>
 #include <config.h>
 #include <signal.h>
 extern "C" {
@@ -24,6 +25,10 @@ extern "C" {
   #include <gtk/gtk.h>
   #include <gmime/gmime.h>
 }
+#ifdef G_OS_WIN32
+#define _WIN32_WINNT 0x0501
+#include <windows.h>
+#endif
 #include <pan/general/debug.h>
 #include <pan/general/log.h>
 #include <pan/general/file-util.h>
@@ -185,8 +190,43 @@ namespace
     Queue & q;
   };
 
+#ifdef G_OS_WIN32
+  void console()
+  {
+    using namespace std;
+    static bool done = false;
+    if ( done ) return;
+    done = true;
+
+    //AllocConsole();
+    if ( !AttachConsole( -1 ) ) return;
+    static ofstream out("CONOUT$");
+    static ofstream err("CONOUT$");
+    streambuf *tmp, *t2;
+
+    tmp = cout.rdbuf();
+    t2 = out.rdbuf();
+    cout.ios::rdbuf( t2 );
+    out.ios::rdbuf( tmp );
+
+    tmp = cerr.rdbuf();
+    t2 = err.rdbuf();
+    cerr.ios::rdbuf( t2 );
+    err.ios::rdbuf( tmp );
+
+    freopen( "CONOUT$", "w", stdout );
+    freopen( "CONOUT$", "w", stderr );
+  }
+#else
+  void console()
+  {
+    return;
+  }
+#endif
+
   void usage ()
   {
+    console();
     std::cerr << "Pan " << VERSION << "\n\n" <<
 _("General Options\n"
 "  -h, --help               Show this usage page.\n"
@@ -231,6 +271,7 @@ main (int argc, char *argv[])
     else if (!strcmp(tok,"--no-gui") || !strcmp(tok,"--nogui"))
       gui = false;
     else if (!strcmp (tok, "--debug")) { // do --debug --debug for verbose debug
+      console();
       if (_debug_flag) _debug_verbose_flag = true;
       else _debug_flag = true;
     } else if (!strcmp (tok, "--nzb"))
@@ -280,8 +321,9 @@ main (int argc, char *argv[])
     // instantiate the queue...
     WorkerPool worker_pool (4, true);
     GIOChannelSocket::Creator socket_creator;
-    Queue queue (data, data, &socket_creator, worker_pool, prefs.get_flag("work-online", true),
-      prefs.get_int("tasks-nzb-delay",10));
+    Queue queue (data, data, &socket_creator, worker_pool,
+                 prefs.get_flag ("work-online", true),
+                 prefs.get_int ("task-save-delay-secs", 10));
     g_timeout_add (5000, queue_upkeep_timer_cb, &queue);
 
     if (nzb || !groups.empty())
@@ -313,9 +355,9 @@ main (int argc, char *argv[])
       // with a gui or without.
       if (gui) {
         TaskPane * pane = new TaskPane (queue, prefs);
+        GtkWidget * w (pane->root());
         GdkPixbuf * pixbuf = gdk_pixbuf_new_from_inline (-1, icon_pan, FALSE, 0);
         gtk_window_set_default_icon (pixbuf);
-        GtkWidget * w (pane->root());
         gtk_widget_show_all (w);
         g_signal_connect (w, "destroy", G_CALLBACK(destroy_cb), 0);
         g_signal_connect (G_OBJECT(w), "delete-event", G_CALLBACK(delete_event_cb), 0);

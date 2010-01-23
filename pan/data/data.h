@@ -557,7 +557,7 @@ namespace pan
        * been run there.
        */
       virtual uint64_t get_xover_high (const Quark  & group,
-                                    const Quark  & server) const = 0;
+                                       const Quark  & server) const = 0;
 
        /**
         * After an XOVER command has been run, its range should be set

@@ -154,11 +154,11 @@ pan :: mime_part_to_utf8 (GMimePart     * part,
     g_mime_object_get_content_type_parameter (GMIME_OBJECT (part), "charset");
   GMimeDataWrapper * content = g_mime_part_get_content_object (part);
   GMimeStream *stream = g_mime_stream_mem_new ();
-  
-  g_mime_data_wrapper_write_to_stream (content,stream);
+
+  g_mime_data_wrapper_write_to_stream (content, stream);
   GByteArray *buf = ((GMimeStreamMem *) stream)->buffer;
-  ret = content_to_utf8 (StringView ((const char *) buf->data, buf->len)
-    , charset, fallback_charset);
+  ret = content_to_utf8 (StringView ((const char *) buf->data, buf->len),
+    charset, fallback_charset);
 
   g_object_unref (stream);
 
@@ -195,9 +195,8 @@ pan :: content_to_utf8 (const StringView  & content,
       encodings[n++] = "ISO-8859-15";
 
       // try each charset in turn
-      char *tmp;
       for (size_t i=0; i!=n; ++i) {
-        tmp = g_convert (content.str, content.len, "UTF-8", encodings[i], 0, 0, 0);
+        char * tmp = g_convert (content.str, content.len, "UTF-8", encodings[i], 0, 0, 0);
         if (tmp) {
           ret = tmp;
           g_free (tmp);

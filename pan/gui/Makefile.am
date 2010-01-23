@@ -6,7 +6,10 @@ libpangui_a_SOURCES = \
  actions.cc \
  body-pane.cc \
  dl-headers-ui.cc \
- e-charset-picker.c \
+ e-action-combo-box.c \
+ e-charset.c \
+ e-charset-combo-box.c \
+ e-charset-dialog.c \
  group-pane.cc \
  group-prefs.cc \
  group-prefs-dialog.cc \
@@ -27,7 +30,6 @@ libpangui_a_SOURCES = \
  score-add-ui.cc \
  score-view-ui.cc \
  server-ui.cc \
- sexy-icon-entry.c \
  task-pane.cc \
  xface.c \
  url.cc
@@ -38,7 +40,10 @@ noinst_HEADERS = \
  body-pane.h \
  defgroup.h \
  dl-headers-ui.h \
- e-charset-picker.h \
+ e-action-combo-box.h \
+ e-charset.h \
+ e-charset-combo-box.h \
+ e-charset-dialog.h \
  group-pane.h \
  group-prefs.h \
  group-prefs-dialog.h \
@@ -64,7 +69,6 @@ noinst_HEADERS = \
  score-add-ui.h \
  score-view-ui.h \
  server-ui.h \
- sexy-icon-entry.h \
  tango-colors.h \
  task-pane.h \
  url.h \
@@ -88,4 +92,8 @@ WINRCOBJ =
 endif
   
 pan_SOURCES = gui.cc pan.cc $(WINRC)
-pan_LDADD = ./libpangui.a $(WINRCOBJ) ../data-impl/libpandata.a ../tasks/libtasks.a ../data/libdata.a ../usenet-utils/libusenetutils.a ../general/libgeneralutils.a ../../uulib/libuu.a @GTKSPELL_LIBS@ @GTK_LIBS@ @GMIME_LIBS@ @GLIB_LIBS@ @PCRE_LIBS@
+pan_LDADD = ./libpangui.a $(WINRCOBJ) ../data-impl/libpandata.a ../tasks/libtasks.a ../data/libdata.a ../usenet-utils/libusenetutils.a ../general/libgeneralutils.a ../../uulib/libuu.a @GTKSPELL_LIBS@ @GTK_LIBS@ @GMIME_LIBS@ @GLIB_LIBS@
+
+if HAVE_WIN32
+pan_LDFLAGS = -mwindows
+endif

@@ -22,6 +22,7 @@
 #include <cassert>
 #include <cstdarg>
 #include <cstdlib> // abort, atoi, strtoul
+#include <cstdio> // snprintf
 extern "C" {
   #include <glib.h>
   #include <glib/gi18n.h>
@@ -334,8 +335,8 @@ NNTP :: write_next_command ()
 
 void
 NNTP :: xover (const Quark   & group,
-               uint64_t   low,
-               uint64_t   high,
+               uint64_t        low,
+               uint64_t        high,
                Listener      * l)
 {
    _listener = l;
@@ -343,7 +344,7 @@ NNTP :: xover (const Quark   & group,
    if (group != _group)
       _commands.push_back (build_command ("GROUP %s\r\n", group.c_str()));
 
-   _commands.push_back (build_command ("XOVER %llu-%llu\r\n", low, high));
+   _commands.push_back (build_command ("XOVER %"G_GUINT64_FORMAT"-%"G_GUINT64_FORMAT"\r\n", low, high));
 
    write_next_command ();
 }
@@ -366,7 +367,7 @@ NNTP :: list (Listener * l)
 
 void
 NNTP :: article (const Quark     & group,
-                 uint64_t     article_number,
+                 uint64_t          article_number,
                  Listener        * l)
 {
    _listener = l;
@@ -374,7 +375,7 @@ NNTP :: article (const Quark     & group,
    if (group != _group)
       _commands.push_back (build_command ("GROUP %s\r\n", group.c_str()));
 
-   _commands.push_back (build_command ("ARTICLE %llu\r\n", article_number));
+   _commands.push_back (build_command ("ARTICLE %"G_GUINT64_FORMAT"\r\n", article_number));
 
    write_next_command ();
 }

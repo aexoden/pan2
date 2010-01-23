@@ -36,17 +36,18 @@ Queue :: Queue (ServerInfo         & server_info,
                 Socket::Creator    * socket_creator,
                 WorkerPool         & pool,
                 bool                 online,
-                int                  nzb_delay):
+                int                  save_delay_secs):
   _server_info (server_info),
   _is_online (online),
   _socket_creator (socket_creator),
   _worker_pool (pool),
   _decoder (pool),
   _decoder_task (0),
+  _save_delay_secs (save_delay_secs),
   _needs_saving (false),
   _last_time_saved (0),
   _archive (archive),
-  nzb_file_delay (nzb_delay)
+  nzb_file_delay (save_delay_secs)
 {
   tasks_t tasks;
   _archive.load_tasks (tasks);
@@ -120,7 +121,7 @@ Queue :: upkeep ()
   // maybe save the task list.
   // only do it once in awhile to prevent thrashing.
   const time_t now (time(0));
-  if (_needs_saving && _last_time_saved<(now-nzb_file_delay)) {
+  if (_needs_saving && _last_time_saved<(now-_save_delay_secs)) {
     _archive.save_tasks (tmp);
     _needs_saving = false;
     _last_time_saved = time(0);

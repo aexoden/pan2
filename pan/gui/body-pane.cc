@@ -158,7 +158,7 @@ namespace
   void free_cursors (void)
   {
     for (int i=0; i<CURSOR_QTY; ++i)
-      gdk_cursor_destroy (cursors[i]);
+      gdk_cursor_unref (cursors[i]);
   }
 
   void ensure_cursors_created (GtkWidget * w)
@@ -837,7 +837,6 @@ namespace
       }
 
       g_object_unref (mem_stream);
-      //g_object_unref (wrapper);
     }
 
     // flush the loader
@@ -1033,8 +1032,7 @@ BodyPane :: set_text_from_message (GMimeMessage * message)
 
   // conditional headers...
   if (message) {
-    const StringView newsgroups (g_mime_object_get_header ((GMimeObject *) message
-      , "Newsgroups"));
+    const StringView newsgroups (g_mime_object_get_header ((GMimeObject *) message, "Newsgroups"));
     if (newsgroups.strchr(',')) {
       l = add_header_line (s, message, _("Newsgroups"), "Newsgroups", fallback_charset);
       w = std::max (w, l);
@@ -1060,10 +1058,8 @@ BodyPane :: set_text_from_message (GMimeMessage * message)
   s.resize (s.size()-1); // remove trailing linefeed
   gtk_label_set_markup (GTK_LABEL(_headers), s.c_str());
 
-#if GTK_CHECK_VERSION(2,6,0)
   // ellipsize mode is useless w/o this in expander...
   gtk_label_set_width_chars (GTK_LABEL(_headers), (int)w);
-#endif
 
   // set the x-face...
   GdkPixbuf * pixbuf (0);
@@ -1082,10 +1078,8 @@ BodyPane :: set_text_from_message (GMimeMessage * message)
   s += _(" at ");
   add_bold_header_value (s, message, "Date", fallback_charset);
   gtk_label_set_markup (GTK_LABEL(_terse), s.c_str());
-#if GTK_CHECK_VERSION(2,6,0)
   // ellipsize mode is useless w/o this in expander...
   gtk_label_set_width_chars (GTK_LABEL(_terse), (int)s.size());
-#endif
 
   // clear the text buffer...
   GtkTextIter start, end;
@@ -1356,25 +1350,19 @@ BodyPane :: BodyPane (Data& data, ArticleCache& cache, Prefs& prefs):
   gtk_box_pack_start (GTK_BOX(vbox), w, false, false, 0);
 
   _terse = gtk_label_new ("Expander");
-  g_object_ref (_terse);
-  gtk_object_sink (GTK_OBJECT(_terse));
+  g_object_ref_sink (G_OBJECT(_terse));
   gtk_misc_set_alignment (GTK_MISC(_terse), 0.0f, 0.5f);
   gtk_label_set_use_markup (GTK_LABEL(_terse), true);
   gtk_label_set_selectable (GTK_LABEL(_terse), true);
-#if GTK_CHECK_VERSION(2,6,0)
   gtk_label_set_ellipsize (GTK_LABEL(_terse), PANGO_ELLIPSIZE_MIDDLE);
-#endif
   gtk_widget_show (_terse);
 
   GtkWidget * hbox = _verbose = gtk_hbox_new (false, 0);
-  g_object_ref (_verbose);
-  gtk_object_sink (GTK_OBJECT(_verbose));
+  g_object_ref_sink (G_OBJECT(_verbose));
   w = _headers = gtk_label_new ("Headers");
   gtk_label_set_selectable (GTK_LABEL(_headers), TRUE);
   gtk_misc_set_alignment (GTK_MISC(w), 0.0f, 0.5f);
-#if GTK_CHECK_VERSION(2,6,0)
   gtk_label_set_ellipsize (GTK_LABEL(w), PANGO_ELLIPSIZE_MIDDLE);
-#endif
   gtk_label_set_use_markup (GTK_LABEL(w), true);
   gtk_box_pack_start (GTK_BOX(hbox), w, true, true, PAD_SMALL);
   w = _xface = gtk_image_new ();
@@ -1524,8 +1512,8 @@ namespace
     std::string body;
   };
 
-  void get_utf8_body_foreach_part (GMimeObject* /*parent*/, GMimeObject *o
-    , gpointer user_data)
+  void get_utf8_body_foreach_part (GMimeObject* /*parent*/, GMimeObject *o,
+                                   gpointer user_data)
   {
     GMimePart * part;
     GMimeContentType * type = g_mime_object_get_content_type (o);
@@ -1558,6 +1546,8 @@ BodyPane :: create_followup_or_reply (bool is_reply)
   if (_message)
   {
     msg = g_mime_message_new (false);
+    GMimeObject *msg_obj = (GMimeObject*)msg;
+    GMimeObject *_message_obj = (GMimeObject*)_message;
 
     // fallback character encodings
     const char * group_charset (_charset.c_str());
@@ -1582,7 +1572,7 @@ BodyPane :: create_followup_or_reply (bool is_reply)
     }
 
     // Subject:
-    StringView v = g_mime_object_get_header ((GMimeObject *) _message, "Subject");
+    StringView v = g_mime_object_get_header (_message_obj, "Subject");
     std::string h = header_to_utf8 (v, message_charset, group_charset);
     std::string val (normalize_subject_re (h));
     if (val.find ("Re:") != 0) // add "Re: " if we don't have one
@@ -1591,22 +1581,22 @@ BodyPane :: create_followup_or_reply (bool is_reply)
 
     // attribution lines
 
-    const char * cpch = g_mime_object_get_header ((GMimeObject *)_message, "From");
+    const char * cpch = g_mime_object_get_header (_message_obj, "From");
     h = header_to_utf8 (cpch, message_charset, group_charset);
-    g_mime_object_append_header ((GMimeObject *) msg, "X-Draft-Attribution-Author", h.c_str());
+    g_mime_object_append_header (msg_obj, "X-Draft-Attribution-Author", h.c_str());
 
     cpch = g_mime_message_get_message_id (_message);
     h = header_to_utf8 (cpch, message_charset, group_charset);
-    g_mime_object_append_header ((GMimeObject *) msg, "X-Draft-Attribution-Id", h.c_str());
+    g_mime_object_append_header (msg_obj, "X-Draft-Attribution-Id", h.c_str());
 
     char * tmp = g_mime_message_get_date_as_string (_message);
     h = header_to_utf8 (tmp, message_charset, group_charset);
-    g_mime_object_append_header ((GMimeObject *) msg, "X-Draft-Attribution-Date", h.c_str());
+    g_mime_object_append_header (msg_obj, "X-Draft-Attribution-Date", h.c_str());
     g_free (tmp);
 
     // references
     const char * header = "References";
-    v = g_mime_object_get_header ((GMimeObject *)_message, header);
+    v = g_mime_object_get_header (_message_obj, header);
     val.assign (v.str, v.len);
     if (!val.empty())
       val += ' ';
@@ -1614,7 +1604,7 @@ BodyPane :: create_followup_or_reply (bool is_reply)
     val += g_mime_message_get_message_id (_message);
     val += ">";
     val = GNKSA :: trim_references (val);
-    g_mime_object_append_header ((GMimeObject *) msg, header, val.c_str());
+    g_mime_object_append_header (msg_obj, header, val.c_str());
 
     ///
     ///  BODY

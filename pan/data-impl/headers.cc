@@ -511,7 +511,7 @@ DataImpl :: load_headers (const DataIO   & data_io,
           if (tok.pop_token(server_tok,':') && tok.pop_token(group_tok,':')) {
             target_it->server = server_tok;
             target_it->group = group_tok.len==1 ? xref_lookup[(int)*group_tok.str] : Quark(group_tok);
-            target_it->number = g_ascii_strtoull (tok.str,NULL,10);
+            target_it->number = g_ascii_strtoull (tok.str, NULL, 10);
             const Server * server (find_server (target_it->server));
             if (server && ((!server->article_expiration_age) || (days_old <= server->article_expiration_age)))
               ++target_it;

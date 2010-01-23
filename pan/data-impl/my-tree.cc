@@ -389,8 +389,6 @@ DataImpl :: MyTree :: add_articles (const const_nodes_v& nodes_in)
   }
 
   // build new MyTree nodes for each of the articles being added
-  //int node_index (_node_chunk.size());
-  //_node_chunk.resize (_node_chunk.size() + nodes.size());
   nodes_v tree_nodes;
   tree_nodes.reserve (nodes.size());
   foreach_const (const_nodes_v, nodes, it) {

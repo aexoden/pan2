@@ -3,7 +3,7 @@
 
 namespace pan
 {
-  extern void g_object_ref_sink_pan (GObject*);
+  extern void pan_box_pack_start_defaults (GtkBox * box, GtkWidget * child);
 };
 
 #define PAD_SMALL 3

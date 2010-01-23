@@ -19,7 +19,8 @@ noinst_HEADERS = \
  data-impl.h \
  data-io.h \
  defgroup.h \
- profiles.h
+ profiles.h \
+ memchunk.h
 
 noinst_PROGRAMS = \
  add-server \
@@ -37,7 +38,7 @@ TEST_LDADD = \
  ../usenet-utils/libusenetutils.a \
  ../general/libgeneralutils.a \
  ../../uulib/libuu.a \
- @GMIME_LIBS@ @GLIB_LIBS@ @PCRE_LIBS@
+ @GMIME_LIBS@ @GLIB_LIBS@
 add_server_SOURCES = add-server.cc
 add_server_LDADD = $(TEST_LDADD)
 headers_test_SOURCES = headers-test.cc

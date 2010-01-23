@@ -44,10 +44,10 @@ namespace pan {
         push_back(T());
         return phead;
       }
-      
+
       MemChunk():chunks(0),head(0),phead(0),nelem(Chunk::size/sizeof(T)),count(0)
       {grow();}
-      
+
       ~MemChunk()
       {
         Chunk *p;
@@ -62,7 +62,7 @@ namespace pan {
         p=chunks;
         chunks=chunks->next;
         delete p;
-        
+
         while(chunks!=0)
         {
           t=reinterpret_cast<T*>(chunks->mem);
@@ -75,12 +75,12 @@ namespace pan {
           delete p;
         }
       }
-      
-    
+
+
     private:
       template<class U> MemChunk(MemChunk<U>&);
       MemChunk* operator=(const MemChunk&);
-      
+
       struct Chunk {
         enum {size=16*1024-sizeof(Chunk*)-32};
         char mem[size];
@@ -92,15 +92,15 @@ namespace pan {
         Chunk *c=new Chunk;
         T *p,*n=0;
         int i;
-        
+
         memset(c->mem,0,Chunk::size);
-        
+
         c->next=chunks;
         count=0;
         chunks=c;
         head=reinterpret_cast<T*>(c->mem);
       };
-      
+
       Chunk *chunks;
       T *phead, *head;
       const int nelem;

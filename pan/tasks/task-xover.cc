@@ -173,8 +173,8 @@ void
 TaskXOver :: on_nntp_group (NNTP          * nntp,
                             const Quark   & group,
                             unsigned long   qty,
-                            uint64_t   low,
-                            uint64_t   high)
+                            uint64_t        low,
+                            uint64_t        high)
 {
   const Quark& servername (nntp->_server);
 
@@ -306,8 +306,10 @@ TaskXOver :: on_nntp_line (NNTP               * nntp,
   // if news server doesn't provide an xref, fake one
   char * buf (0);
   if (xref.empty())
-    xref = buf = g_strdup_printf ("%s %s:%llu",
-                       nntp->_server.c_str(), nntp->_group.c_str(), number);
+    xref = buf = g_strdup_printf ("%s %s:%"G_GUINT64_FORMAT,
+                                  nntp->_server.c_str(),
+                                  nntp->_group.c_str(),
+                                  number);
 
   uint64_t& h (_high[nntp->_server]);
   h = std::max (h, number);
