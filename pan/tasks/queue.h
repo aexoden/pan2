@@ -222,6 +222,7 @@ namespace pan
 
     private:
       TaskArchive& _archive;
+      void clean_n_save ();
 
     private:
       typedef AdaptableSet<Task*, TaskWeakOrdering> TaskSet;

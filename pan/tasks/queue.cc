@@ -64,6 +64,8 @@ Queue :: ~Queue ()
     delete it->second;
   _pools.clear ();
 
+  clean_n_save();
+
   foreach (TaskSet, _tasks, it)
     delete *it;
 }
@@ -105,9 +107,8 @@ Queue :: get_pool (const Quark& servername)
 /***
 ****
 ***/
-
 void
-Queue :: upkeep ()
+Queue :: clean_n_save ()
 {
   const tasks_t tmp (_tasks.begin(), _tasks.end());
   // remove completed tasks.
@@ -126,6 +127,14 @@ Queue :: upkeep ()
     _needs_saving = false;
     _last_time_saved = time(0);
   }
+}
+
+void
+Queue :: upkeep ()
+{
+  clean_n_save();
+
+  const tasks_t tmp (_tasks.begin(), _tasks.end());
 
   // do upkeep on the first queued task.
   // the CPU goes crazy if we run upkeep on _all_ queued tasks,
